@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Nuxt / Vite
+.nuxt/
+.output/
+dist/
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+
+# Tests
+coverage/
+*.lcov
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# VS Code (оставьте extensions.json в репо при необходимости)
+.vscode/*
+!.vscode/extensions.json
