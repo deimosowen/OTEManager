@@ -4,6 +4,11 @@ export default defineNuxtConfig({
   srcDir: 'src/',
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
+  /**
+   * Имена компонентов = имя файла (PascalCase), без префикса папки.
+   * Иначе `components/layout/AppToastHost.vue` становится `LayoutAppToastHost`, а в разметке — `AppToastHost`.
+   */
+  components: [{ path: '~/components', pathPrefix: false }],
   modules: ['@pinia/nuxt', '@nuxtjs/tailwindcss'],
   css: ['~/assets/css/main.css'],
   app: {

@@ -4,7 +4,8 @@
 
 ## Требования
 
-- **Node.js** 20+ (рекомендуется актуальный LTS, см. предупреждения `npm` при установке).
+- **Node.js ≥ 20.12.0** — иначе Nuxt CLI падает с ошибкой `does not provide an export named 'styleText'` (API `util.styleText` появился в Node 20.12).
+- Рекомендуется **Node 20.19+** (см. `.nvmrc` и предупреждения `npm` про `EBADENGINE`).
 
 ## Быстрый старт
 
@@ -19,14 +20,16 @@ npm run dev
 
 ## Скрипты
 
-| Команда | Назначение |
-|--------|------------|
-| `npm run dev` | Режим разработки |
-| `npm run build` | Production-сборка |
-| `npm run preview` | Просмотр собранного приложения |
-| `npm run test` | Unit-тесты (Vitest) |
-| `npm run test:watch` | Тесты в watch-режиме |
+
+| Команда                 | Назначение                             |
+| ----------------------- | -------------------------------------- |
+| `npm run dev`           | Режим разработки                       |
+| `npm run build`         | Production-сборка                      |
+| `npm run preview`       | Просмотр собранного приложения         |
+| `npm run test`          | Unit-тесты (Vitest)                    |
+| `npm run test:watch`    | Тесты в watch-режиме                   |
 | `npm run test:coverage` | Тесты с отчётом покрытия (`coverage/`) |
+
 
 ## Структура репозитория
 
@@ -88,8 +91,13 @@ git push -u origin main
 
 Скопируйте `.env.example` в `.env` и заполните значения, когда появится backend (сейчас файл-заглушка).
 
+## Ошибка `styleText` при `npm run dev`
+
+Сообщение вида: *The requested module 'node:util' does not provide an export named 'styleText'* означает, что версия Node **ниже 20.12**. Обновите Node (например, с [nodejs.org](https://nodejs.org/) или через `nvm use` по файлу `.nvmrc`), затем снова `npm install` и `npm run dev`.
+
 ## Дальнейшее развитие
 
 - Подключить реальный API вместо моков в `src/mocks/`.
 - OAuth Яндекса вместо `loginWithYandexMock()` в `src/stores/auth.js`.
 - При необходимости — e2e (Playwright) и компонентные тесты с `@vue/test-utils`.
+
