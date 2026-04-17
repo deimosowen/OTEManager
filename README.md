@@ -1,5 +1,7 @@
 # OTE Manager
 
+Репозиторий: [github.com/deimosowen/OTEManager](https://github.com/deimosowen/OTEManager)
+
 Веб-интерфейс для управления тестовыми окружениями **OTE**. Стек: **Nuxt 3**, **Vue 3**, **JavaScript** (без TypeScript в исходниках), **Tailwind CSS**, **Pinia**.
 
 ## Требования
@@ -10,7 +12,7 @@
 ## Быстрый старт
 
 ```bash
-git clone <url-репозитория>
+git clone https://github.com/deimosowen/OTEManager.git
 cd OTEManager
 npm install
 npm run dev
