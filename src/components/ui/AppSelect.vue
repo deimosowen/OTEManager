@@ -1,5 +1,5 @@
 <template>
-  <div class="w-full">
+  <div class="min-w-0">
     <label v-if="label" class="mb-1.5 block text-sm font-bold text-slate-800">{{ label }}</label>
     <div class="relative">
       <select

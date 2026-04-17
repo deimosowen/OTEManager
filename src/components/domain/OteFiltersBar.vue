@@ -1,6 +1,8 @@
 <template>
-  <div class="mb-5 flex flex-wrap items-center gap-2.5">
-    <div class="relative min-w-[200px] flex-1">
+  <div
+    class="mb-5 flex flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+  >
+    <div class="relative min-w-[140px] max-w-[240px] shrink-0 basis-[min(100%,200px)] sm:basis-[220px]">
       <Search class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
       <input
         v-model="local.query"
@@ -12,32 +14,34 @@
     </div>
 
     <AppSelect
-      class="w-[170px]"
+      class="w-[148px] shrink-0 sm:w-[160px]"
       :model-value="local.product"
       :options="productOpts"
       @update:model-value="(v) => ((local.product = v), emitFilters())"
     />
     <AppSelect
-      class="w-[170px]"
+      class="w-[148px] shrink-0 sm:w-[160px]"
       :model-value="local.status"
       :options="statusOpts"
       @update:model-value="(v) => ((local.status = v), emitFilters())"
     />
     <AppSelect
-      class="w-[190px]"
+      class="w-[158px] shrink-0 sm:w-[172px]"
       :model-value="local.type"
       :options="typeOpts"
       @update:model-value="(v) => ((local.type = v), emitFilters())"
     />
 
-    <label class="flex cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600">
-      <input v-model="local.onlyMine" type="checkbox" class="size-4 accent-brand" @change="emitFilters" />
+    <label
+      class="flex shrink-0 cursor-pointer select-none items-center gap-2 whitespace-nowrap rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm font-semibold text-slate-600 sm:px-3"
+    >
+      <input v-model="local.onlyMine" type="checkbox" class="size-4 shrink-0 accent-brand" @change="emitFilters" />
       Мои окружения
     </label>
 
     <button
       type="button"
-      class="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-rose-300 hover:text-rose-600"
+      class="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500 transition hover:border-rose-300 hover:text-rose-600 sm:px-4"
       @click="reset"
     >
       Сбросить

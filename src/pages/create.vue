@@ -9,9 +9,9 @@
 
       <div class="mt-8 space-y-5">
         <AppInput v-model="form.name" label="Имя OTE" placeholder="ote-test-env" autocomplete="off" />
-        <AppSelect v-model="form.caseOneVersion" label="Версия CaseOne" :options="caseOneOptions" />
-        <AppSelect v-model="form.deployTemplate" label="Шаблон деплоя" :options="templateOptions" />
-        <AppSelect v-model="form.dbVersion" label="Версия БД" :options="dbOptions" />
+        <AppSelect class="w-full" v-model="form.caseOneVersion" label="Версия CaseOne" :options="caseOneOptions" />
+        <AppSelect class="w-full" v-model="form.deployTemplate" label="Шаблон деплоя" :options="templateOptions" />
+        <AppSelect class="w-full" v-model="form.dbVersion" label="Версия БД" :options="dbOptions" />
       </div>
 
       <div class="mt-8 flex gap-3">
