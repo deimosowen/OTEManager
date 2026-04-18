@@ -35,7 +35,7 @@ npm run dev
 
 ## Структура репозитория
 
-Корень — конфигурация и Git; **код приложения** — в каталоге **`src/`** (`srcDir` в Nuxt).
+Корень — конфигурация и Git; **код приложения** — в каталоге `**src/`** (`srcDir` в Nuxt).
 
 ```
 .
@@ -49,6 +49,7 @@ npm run dev
 │   ├── middleware/
 │   ├── mocks/
 │   ├── pages/
+│   ├── server/             # Nitro: API, server middleware, utils (serverDir)
 │   ├── stores/
 │   └── utils/
 ├── tests/                  # Unit-тесты (Vitest)
@@ -66,13 +67,14 @@ npm run dev
 
 Слои внутри `src/`:
 
-- **`pages/`** — маршруты.
-- **`layouts/`** — шаблоны страниц (`default`, `auth`).
-- **`components/ui/`** — базовые UI-примитивы.
-- **`components/domain/`** — логика списка OTE, фильтры, статусы.
-- **`components/layout/`** — шапка, сайдбар, тосты.
-- **`stores/`** — Pinia (`auth`, `environments`).
-- **`constants/`**, **`mocks/`**, **`utils/`** — константы, моки, утилиты.
+- `**pages/**` — маршруты.
+- `**layouts/**` — шаблоны страниц (`default`, `auth`).
+- `**components/ui/**` — базовые UI-примитивы.
+- `**components/domain/**` — логика списка OTE, фильтры, статусы.
+- `**components/layout/**` — шапка, сайдбар, тосты.
+- `**stores/**` — Pinia (`auth`, `environments`).
+- `**constants/**`, `**mocks/**`, `**utils/**` — константы, моки, утилиты.
+- `**server/**` — Nitro (только Node): `api/`, `middleware/`, `utils/` для OAuth и сессии.
 
 ## Git
 
@@ -91,7 +93,23 @@ git push -u origin main
 
 ## Переменные окружения
 
-Скопируйте `.env.example` в `.env` и заполните значения, когда появится backend (сейчас файл-заглушка).
+Скопируйте `.env.example` в `.env` и заполните значения.
+
+### Авторизация через Яндекс (OAuth)
+
+1. Откройте [Яндекс OAuth](https://oauth.yandex.ru/) и создайте приложение.
+2. В поле **Redirect URI** укажите ровно:
+  `{NUXT_PUBLIC_SITE_URL}/api/auth/yandex/callback`  
+   Например для локальной разработки: `http://localhost:3000/api/auth/yandex/callback`.
+3. Включите права доступа к данным (минимум **Доступ к логину, имени и фамилии**, **Доступ к адресу электронной почты** — соответствует scope `login:info login:email` в коде).
+4. В `.env` задайте:
+  - `NUXT_PUBLIC_SITE_URL` — тот же базовый URL, что и в настройках приложения;
+  - `NUXT_PUBLIC_YANDEX_CLIENT_ID` — ID приложения;
+  - `NUXT_YANDEX_CLIENT_SECRET` — секрет;
+  - `NUXT_SESSION_SECRET` — длинная случайная строка для подписи cookie-сессии.
+5. Опционально `NUXT_ALLOWED_EMAIL_DOMAINS` — список разрешённых доменов email через запятую (как `ALLOWED_EMAIL_DOMAINS` в Mattermost_CaseOneBot).
+
+Поток такой же, как в [Mattermost_CaseOneBot](https://github.com/deimosowen/Mattermost_CaseOneBot): редирект на Яндекс → callback → обмен `code` на токен → запрос `https://login.yandex.ru/info` → сессия в httpOnly-cookie.
 
 ## Ошибка `styleText` при `npm run dev`
 
@@ -99,7 +117,9 @@ git push -u origin main
 
 ## Дальнейшее развитие
 
-- Подключить реальный API вместо моков в `src/mocks/`.
-- OAuth Яндекса вместо `loginWithYandexMock()` в `src/stores/auth.js`.
+- Подключить реальный API окружений OTE вместо моков в `src/mocks/`.
 - При необходимости — e2e (Playwright) и компонентные тесты с `@vue/test-utils`.
 
+### Серверные маршруты (Nitro)
+
+Каталог `src/server/` (опция `serverDir` в `nuxt.config.js`): `src/server/api/auth/`* — OAuth, сессия, выход.

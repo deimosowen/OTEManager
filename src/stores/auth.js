@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
+import { safeReturnPath } from '~/utils/safe-return-path'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    /** В проде заменить на реальный OAuth (Яндекс) */
     user: null,
   }),
   getters: {
@@ -16,10 +16,25 @@ export const useAuthStore = defineStore('auth', {
     },
   },
   actions: {
-    loginWithYandexMock() {
-      this.user = { name: 'Aleksandr Demo', email: 'demo@example.com' }
+    setUser(user) {
+      this.user = user
     },
-    logout() {
+    /** Редирект на серверный маршрут OAuth Яндекса */
+    startYandexLogin(returnPath = '/') {
+      const safe = safeReturnPath(returnPath)
+      const url = `/api/auth/yandex?return=${encodeURIComponent(safe)}`
+      if (import.meta.client) {
+        window.location.href = url
+      }
+    },
+    async logout() {
+      if (import.meta.client) {
+        try {
+          await fetchInternalApi('/api/auth/logout', { method: 'POST' })
+        } catch {
+          /* сеть */
+        }
+      }
       this.user = null
     },
   },
