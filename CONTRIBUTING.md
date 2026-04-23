@@ -8,11 +8,19 @@
 
 ## Перед отправкой PR
 
+На **Pull Request** в `main` / `master` автоматически запускается **GitHub Actions** (`.github/workflows/ci.yml`): `npm ci` → `npm run test` → `npm run build`. Убедитесь, что пайплайн зелёный.
+
+Локально перед пушем:
+
 ```bash
 npm install
 npm run test
 npm run build
 ```
+
+### Настройки репозитория (рекомендуется)
+
+В **Settings → Branches → Branch protection rules** для `main`: включить **Require status checks to pass** и отметить job **«Test & build»** из workflow CI.
 
 ## Структура
 
