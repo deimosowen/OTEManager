@@ -6,6 +6,7 @@ import { OTE_STATUS } from '~/constants/ote'
 describe('useEnvironmentsStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    useEnvironmentsStore().useSeedList()
   })
 
   it('фильтрует по поисковой строке (имя)', () => {

@@ -5,7 +5,9 @@
  */
 export async function fetchInternalApi(path, init = {}) {
   const origin = import.meta.server ? useRequestURL().origin : window.location.origin
-  const url = `${origin}${path.startsWith('/') ? path : `/${path}`}`
+  const p = path.startsWith('/') ? path : `/${path}`
+  /** `new URL` гарантирует корректный абсолютный URL (Vue Router не трогает такие запросы). */
+  const url = new URL(p, `${origin.replace(/\/+$/, '')}/`).href
 
   const merged = {
     credentials: 'include',

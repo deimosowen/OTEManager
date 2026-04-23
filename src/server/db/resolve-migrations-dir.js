@@ -1,0 +1,16 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+
+/**
+ * Папка с SQL-миграциями: prod (скопировано в .output) или dev (исходники в src).
+ * Переопределение: `NUXT_SQLITE_MIGRATIONS_DIR` (абсолютный путь).
+ * @param {string | undefined} fromRuntimeConfig
+ */
+export function resolveMigrationsDir(fromRuntimeConfig) {
+  const trimmed = typeof fromRuntimeConfig === 'string' ? fromRuntimeConfig.trim() : ''
+  if (trimmed) return trimmed
+  const cwd = process.cwd()
+  const fromBuild = join(cwd, '.output', 'server', 'db', 'migrations')
+  if (existsSync(fromBuild)) return fromBuild
+  return join(cwd, 'src', 'server', 'db', 'migrations')
+}

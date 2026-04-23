@@ -1,0 +1,58 @@
+/** Размер страницы журнала аудита (фиксировано на сервере и в UI). */
+export const AUDIT_LIST_PAGE_SIZE = 20
+
+/** Пауза после ввода в строке поиска перед запросом (мс). */
+export const AUDIT_SEARCH_DEBOUNCE_MS = 2500
+
+/**
+ * Коды событий аудита (TEXT в БД). Новые действия — новая константа + подпись в AUDIT_ACTION_LABELS.
+ * @readonly
+ */
+export const AUDIT_ACTION = {
+  LOGIN: 'login',
+  OTE_CREATE: 'ote_create',
+  OTE_CREATE_TC_QUEUE: 'ote_create_tc_queue',
+  OTE_CREATE_TC_SUCCEEDED: 'ote_create_tc_succeeded',
+  OTE_CREATE_TC_FAILED: 'ote_create_tc_failed',
+  OTE_TC_START: 'ote_tc_start',
+  OTE_TC_STOP: 'ote_tc_stop',
+  OTE_TC_DELETE: 'ote_tc_delete',
+  OTE_QUEUE_DELETE: 'ote_queue_delete',
+  OTE_POWER_START: 'ote_power_start',
+  OTE_POWER_STOP: 'ote_power_stop',
+  OTE_DEPLOY_TEMPLATE_CREATE: 'ote_deploy_template_create',
+  OTE_DEPLOY_TEMPLATE_UPDATE: 'ote_deploy_template_update',
+}
+
+/** @type {Record<string, string>} */
+export const AUDIT_ACTION_LABELS = {
+  [AUDIT_ACTION.LOGIN]: 'Вход в систему',
+  [AUDIT_ACTION.OTE_CREATE]: 'Создание OTE',
+  [AUDIT_ACTION.OTE_CREATE_TC_QUEUE]: 'Создание OTE: постановка в TeamCity',
+  [AUDIT_ACTION.OTE_CREATE_TC_SUCCEEDED]: 'Создание OTE: сборка успешна',
+  [AUDIT_ACTION.OTE_CREATE_TC_FAILED]: 'Создание OTE: ошибка TeamCity',
+  [AUDIT_ACTION.OTE_TC_START]: 'Запуск (TeamCity)',
+  [AUDIT_ACTION.OTE_TC_STOP]: 'Остановка (TeamCity)',
+  [AUDIT_ACTION.OTE_TC_DELETE]: 'Удаление (TeamCity)',
+  [AUDIT_ACTION.OTE_QUEUE_DELETE]: 'Удаление (очередь)',
+  [AUDIT_ACTION.OTE_POWER_START]: 'Запуск ВМ (очередь)',
+  [AUDIT_ACTION.OTE_POWER_STOP]: 'Остановка ВМ (очередь)',
+  [AUDIT_ACTION.OTE_DEPLOY_TEMPLATE_CREATE]: 'Шаблон деплоя: создание',
+  [AUDIT_ACTION.OTE_DEPLOY_TEMPLATE_UPDATE]: 'Шаблон деплоя: изменение',
+}
+
+/**
+ * @param {string} code
+ */
+export function auditActionLabel(code) {
+  return AUDIT_ACTION_LABELS[code] || code
+}
+
+/** Опции для фильтра «тип действия» (значение пустой строки = все). */
+export const AUDIT_ACTION_FILTER_OPTIONS = [
+  { value: '', label: 'Все действия' },
+  ...Object.values(AUDIT_ACTION).map((value) => ({
+    value,
+    label: AUDIT_ACTION_LABELS[value] || value,
+  })),
+]
