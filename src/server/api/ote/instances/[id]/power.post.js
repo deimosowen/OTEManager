@@ -1,0 +1,80 @@
+import { AUDIT_ACTION } from '@app-constants/audit.js'
+import { auditPayloadFromUser, recordAuditEvent } from '../../../../utils/audit-log.js'
+import { peekTcPending } from '../../../../utils/ote-tc-pending.js'
+import { requireOteUser } from '../../../../utils/require-ote-auth.js'
+import { COMMAND_TYPES } from '../../../../utils/command-queue/command-types.js'
+import { getCommandQueue } from '../../../../utils/command-queue/queue.js'
+import { runtimeConfigString } from '../../../../utils/yc/config-helpers.js'
+import { createYandexCloudSession } from '../../../../utils/yc/session.js'
+import { pickMetadataTagFromMembers } from '../../../../utils/teamcity/metadata-tag.js'
+import { listMemberInstancesForOteId } from '../../../../utils/yc/ote-members.js'
+
+/**
+ * Запуск / остановка всех ВМ OTE: `{ "action": "start" | "stop" }`.
+ * Выполнение ставится во внутреннюю очередь; обработчик пока — заглушка (без YC).
+ */
+export default defineEventHandler(async (event) => {
+  const user = requireOteUser(event)
+  const id = event.context.params?.id
+  if (!id) {
+    throw createError({ statusCode: 400, message: 'Не указан id' })
+  }
+  const body = await readBody(event)
+  const action = body && typeof body.action === 'string' ? body.action.toLowerCase() : ''
+  if (action !== 'start' && action !== 'stop') {
+    throw createError({ statusCode: 400, message: 'Ожидается action: start или stop' })
+  }
+  const config = useRuntimeConfig(event)
+  const folderId = runtimeConfigString(config.ycFolderId, 'NUXT_YC_FOLDER_ID')
+  if (!folderId) {
+    throw createError({ statusCode: 503, message: 'Не задан NUXT_YC_FOLDER_ID' })
+  }
+  const session = createYandexCloudSession(config)
+  if (!session) {
+    throw createError({ statusCode: 503, message: 'Не настроен ключ сервисного аккаунта YC' })
+  }
+  const members = await listMemberInstancesForOteId(session, folderId, id, config)
+  if (!members.length) {
+    throw createError({ statusCode: 404, message: 'ВМ не найдены' })
+  }
+
+  const tcWait = peekTcPending(id)
+  if (tcWait) {
+    throw createError({
+      statusCode: 409,
+      message:
+        'Нельзя запускать/останавливать ВМ через API, пока не завершена операция TeamCity (запуск или остановка по тегу).',
+      data: { current: tcWait },
+    })
+  }
+
+  const jobResult = await getCommandQueue().dispatch(
+    COMMAND_TYPES.OTE_INSTANCE_POWER,
+    {
+      oteId: id,
+      action,
+      memberIds: members.map((m) => m.id).filter(Boolean),
+    },
+    { path: event.path },
+  )
+
+  const labelKey =
+    runtimeConfigString(config.ycInstanceLabelKey, 'NUXT_YC_INSTANCE_LABEL_KEY') || 'metadata-tag'
+  const oteTag = pickMetadataTagFromMembers(members, labelKey) || null
+  const auditAction = action === 'start' ? AUDIT_ACTION.OTE_POWER_START : AUDIT_ACTION.OTE_POWER_STOP
+  await recordAuditEvent(
+    auditPayloadFromUser(user, {
+      actionCode: auditAction,
+      oteResourceId: id,
+      oteTag,
+      details: { powerAction: action, affected: members.length, queueResult: jobResult != null },
+    }),
+  )
+
+  return {
+    action,
+    affected: members.length,
+    stub: true,
+    job: jobResult,
+  }
+})

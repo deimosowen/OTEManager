@@ -6,8 +6,7 @@
 
 ## Требования
 
-- **Node.js ≥ 20.12.0** — иначе Nuxt CLI падает с ошибкой `does not provide an export named 'styleText'` (API `util.styleText` появился в Node 20.12).
-- Рекомендуется **Node 20.19+** (см. `.nvmrc` и предупреждения `npm` про `EBADENGINE`).
+- **Node.js ≥ 22.15.0** — см. `engines` в `package.json` и файл `.nvmrc` (для `@yandex-cloud/nodejs-sdk` и актуального Nuxt).
 
 ## Быстрый старт
 
@@ -18,7 +17,9 @@ npm install
 npm run dev
 ```
 
-Откройте [http://localhost:3000](http://localhost:3000). Экран входа использует **демо-авторизацию** (кнопка «Войти через Яндекс»); позже подключается реальный OAuth и API.
+Откройте [http://localhost:3000](http://localhost:3000). Вход — **OAuth Яндекса** (настройки в `.env`, см. ниже).
+
+После входа доступны: список OTE из **Yandex Compute** (метки на ВМ), карточка окружения, **аудит**, **шаблоны деплоя** (YAML в БД), **создание OTE через TeamCity** (нужен токен TC в профиле или серверные `NUXT_TC_*`).
 
 ## Скрипты
 
@@ -31,7 +32,13 @@ npm run dev
 | `npm run test`          | Unit-тесты (Vitest)                    |
 | `npm run test:watch`    | Тесты в watch-режиме                   |
 | `npm run test:coverage` | Тесты с отчётом покрытия (`coverage/`) |
+| `npm run db:generate`   | Генерация миграций Drizzle (при изменении схемы) |
+| `npm run db:push`       | Применить схему к БД (dev) |
+| `npm run db:studio`     | Drizzle Studio |
 
+## База данных (SQLite)
+
+По умолчанию файл БД: `data/ote.sqlite` (каталог `data/` в `.gitignore` для `*.sqlite`). Миграции лежат в `src/server/db/migrations/` и применяются при старте сервера (плагин `0-database`). Переменная **`NUXT_SQLITE_PATH`** — необязательный путь к файлу БД.
 
 ## Структура репозитория
 
@@ -74,7 +81,15 @@ npm run dev
 - `**components/layout/**` — шапка, сайдбар, тосты.
 - `**stores/**` — Pinia (`auth`, `environments`).
 - `**constants/**`, `**mocks/**`, `**utils/**` — константы, моки, утилиты.
-- `**server/**` — Nitro (только Node): `api/`, `middleware/`, `utils/` для OAuth и сессии.
+- `**server/**` — Nitro (только Node): `api/` (OAuth, YC, TeamCity, шаблоны, аудит), `db/`, `plugins/`, `utils/` (YC, TeamCity, аудит, очереди).
+
+## Переменные: Yandex Cloud и TeamCity
+
+Кратко (полный список — в **`.env.example`**):
+
+- **YC**: `NUXT_YC_FOLDER_ID`, ключ сервисного аккаунта (`NUXT_YC_SA_KEY_PATH` или `NUXT_YC_SERVICE_ACCOUNT_JSON`), метки ВМ (`NUXT_YC_INSTANCE_LABEL_KEY` и др.).
+- **TeamCity**: серверный PAT / логин-пароль **или** персональный токен пользователя в профиле; `NUXT_TC_*` — URL и build type id при необходимости.
+- **«Мои окружения»** в списке: совпадение метки автора (`NUXT_YC_OTE_AUTHOR_LABEL`, по умолчанию `run-by`) с логином или почтой из сессии Яндекса.
 
 ## Git
 
@@ -117,9 +132,9 @@ git push -u origin main
 
 ## Дальнейшее развитие
 
-- Подключить реальный API окружений OTE вместо моков в `src/mocks/`.
+- Расширение сценариев TeamCity и интеграций по мере появления требований.
 - При необходимости — e2e (Playwright) и компонентные тесты с `@vue/test-utils`.
 
 ### Серверные маршруты (Nitro)
 
-Каталог `src/server/` (опция `serverDir` в `nuxt.config.js`): `src/server/api/auth/`* — OAuth, сессия, выход.
+Каталог `src/server/api/` — в том числе `auth/`, `me/`, `ote/` (список и карточка из YC, создание OTE, шаблоны, аудит).

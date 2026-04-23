@@ -1,4 +1,6 @@
 import { getCookie, deleteCookie } from 'h3'
+import { AUDIT_ACTION } from '@app-constants/audit.js'
+import { recordAuditEvent } from '../../../utils/audit-log.js'
 import {
   OTE_RETURN_COOKIE,
   OTE_STATE_COOKIE,
@@ -88,6 +90,15 @@ export default defineEventHandler(async (event) => {
     email: email || '',
     name,
     avatarId,
+  })
+
+  await recordAuditEvent({
+    actorLogin: info.login || '',
+    actorEmail: email || '',
+    actionCode: AUDIT_ACTION.LOGIN,
+    oteResourceId: null,
+    oteTag: null,
+    details: { name },
   })
 
   clearOAuthCookies()

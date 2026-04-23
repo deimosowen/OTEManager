@@ -1,12 +1,12 @@
 <template>
   <div>
-    <div class="mb-4 text-xs font-bold uppercase tracking-wide text-slate-500">Выберите тип окружения</div>
+    <div class="mb-4 text-xs font-bold uppercase tracking-wide text-slate-500">{{ heading }}</div>
     <div class="flex flex-wrap gap-3">
       <button
-        v-for="t in types"
+        v-for="t in typesList"
         :key="t.id"
         type="button"
-        class="w-[120px] rounded-xl border-2 bg-white p-4 text-center transition hover:border-brand hover:shadow-[0_0_0_3px_rgba(37,99,235,0.10)]"
+        class="min-h-[104px] w-[120px] max-w-[132px] rounded-xl border-2 bg-white p-3 text-center transition hover:border-brand hover:shadow-[0_0_0_3px_rgba(37,99,235,0.10)]"
         :class="modelValue === t.id ? 'border-brand bg-brand-light shadow-[0_0_0_3px_rgba(37,99,235,0.15)]' : 'border-slate-200'"
         @click="$emit('update:modelValue', t.id)"
       >
@@ -26,16 +26,23 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { Monitor } from 'lucide-vue-next'
 import { OTE_ENV_TYPES } from '~/constants/ote'
 
-defineProps({
+const props = defineProps({
   modelValue: { type: String, default: 'astra-linux' },
+  /** Заголовок блока выбора */
+  heading: { type: String, default: 'Выберите тип окружения' },
+  /** Список `{ id, name, subtitle }`. Если пусто — берутся типы из `~/constants/ote`. */
+  types: { type: Array, default: null },
 })
 
 defineEmits(['update:modelValue'])
 
-const types = OTE_ENV_TYPES
+const typesList = computed(() =>
+  Array.isArray(props.types) && props.types.length ? props.types : OTE_ENV_TYPES,
+)
 
 function iconWrapClass(id) {
   const map = {
@@ -44,6 +51,8 @@ function iconWrapClass(id) {
     'win-saas': 'bg-sky-100',
     'linux-single': 'bg-emerald-50',
     'linux-saas': 'bg-orange-50',
+    'linux-tantor-single': 'bg-violet-50',
+    'linux-tantor-saas': 'bg-violet-50',
   }
   return map[id] || 'bg-slate-100'
 }
@@ -55,6 +64,8 @@ function iconClass(id) {
     'win-saas': 'text-sky-400',
     'linux-single': 'text-emerald-600',
     'linux-saas': 'text-orange-600',
+    'linux-tantor-single': 'text-violet-600',
+    'linux-tantor-saas': 'text-violet-500',
   }
   return map[id] || 'text-slate-600'
 }

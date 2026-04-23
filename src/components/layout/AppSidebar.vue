@@ -17,17 +17,28 @@
 </template>
 
 <script setup>
-import { LayoutGrid, UserRound } from 'lucide-vue-next'
+import { FileStack, LayoutGrid, ScrollText, UserRound } from 'lucide-vue-next'
 
 const route = useRoute()
 
 const items = [
-  { to: '/', label: 'Окружения OTE', icon: LayoutGrid, match: 'prefix' },
+  { to: '/', label: 'Окружения OTE', icon: LayoutGrid, match: 'mvp' },
+  { to: '/templates', label: 'Шаблоны', icon: FileStack, match: 'templates' },
+  { to: '/audit', label: 'Аудит', icon: ScrollText, match: 'audit' },
   { to: '/profile', label: 'Профиль', icon: UserRound, match: 'exact' },
 ]
 
 function isActive(item) {
   if (item.match === 'exact') return route.path === item.to
-  return route.path === '/' || route.path.startsWith('/create') || route.path.startsWith('/environments/')
+  if (item.match === 'templates') return route.path.startsWith('/templates')
+  if (item.match === 'audit') return route.path.startsWith('/audit')
+  if (item.match === 'mvp') {
+    return (
+      route.path === '/' ||
+      route.path.startsWith('/create') ||
+      route.path.startsWith('/environments/')
+    )
+  }
+  return false
 }
 </script>

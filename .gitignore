@@ -11,6 +11,15 @@ dist/
 .env.*
 !.env.example
 
+# Ключи и секреты (локально)
+keys/
+
+# SQLite (локальная БД)
+data/*.sqlite
+data/*.sqlite-*
+data/*.db
+!data/.gitkeep
+
 # Logs & OS
 *.log
 .DS_Store
