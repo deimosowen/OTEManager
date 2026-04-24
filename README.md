@@ -24,21 +24,50 @@ npm run dev
 ## Скрипты
 
 
-| Команда                 | Назначение                             |
-| ----------------------- | -------------------------------------- |
-| `npm run dev`           | Режим разработки                       |
-| `npm run build`         | Production-сборка                      |
-| `npm run preview`       | Просмотр собранного приложения         |
-| `npm run test`          | Unit-тесты (Vitest)                    |
-| `npm run test:watch`    | Тесты в watch-режиме                   |
-| `npm run test:coverage` | Тесты с отчётом покрытия (`coverage/`) |
-| `npm run db:generate`   | Генерация миграций Drizzle (при изменении схемы) |
-| `npm run db:push`       | Применить схему к БД (dev) |
-| `npm run db:studio`     | Drizzle Studio |
+| Команда                  | Назначение                                          |
+| ------------------------ | --------------------------------------------------- |
+| `npm run dev`            | Режим разработки                                    |
+| `npm run build`          | Production-сборка                                   |
+| `npm run preview`        | Просмотр собранного приложения                      |
+| `npm run test`           | Unit-тесты (Vitest)                                 |
+| `npm run test:watch`     | Тесты в watch-режиме                                |
+| `npm run test:coverage`  | Тесты с отчётом покрытия (`coverage/`)              |
+| `npm run db:generate`    | Генерация миграций Drizzle (при изменении схемы)    |
+| `npm run db:push`        | Применить схему к БД (dev)                          |
+| `npm run db:studio`      | Drizzle Studio                                      |
+| `npm run docker:publish` | Сборка и push образа (`DOCKER_IMAGE=…`, см. Docker) |
+
 
 ## База данных (SQLite)
 
-По умолчанию файл БД: `data/ote.sqlite` (каталог `data/` в `.gitignore` для `*.sqlite`). Миграции лежат в `src/server/db/migrations/` и применяются при старте сервера (плагин `0-database`). Переменная **`NUXT_SQLITE_PATH`** — необязательный путь к файлу БД.
+По умолчанию файл БД: `data/ote.sqlite` (каталог `data/` в `.gitignore` для `*.sqlite`). Миграции лежат в `src/server/db/migrations/` и применяются при старте сервера (плагин `0-database`). Переменная `**NUXT_SQLITE_PATH`** — необязательный путь к файлу БД.
+
+## Запуск в Docker
+
+В корне репозитория: `**Dockerfile`**, `**docker-compose.yml`**, `**.dockerignore**`, пример переменных — `**.env.docker.example**`.
+
+1. Скопируйте пример: `cp .env.docker.example .env.docker`.
+2. Заполните минимум: `**NUXT_PUBLIC_SITE_URL**`, `**NUXT_PUBLIC_YANDEX_CLIENT_ID**`, `**NUXT_YANDEX_CLIENT_SECRET**`, `**NUXT_SESSION_SECRET**`. В кабинете Яндекс OAuth redirect URI должен быть `{NUXT_PUBLIC_SITE_URL}/api/auth/yandex/callback` (для локального Docker часто `http://localhost:3000/...`).
+3. Сборка и старт: `docker compose up -d --build`.
+4. Откройте [http://localhost:3000](http://localhost:3000) (или порт из переменной `**PORT**` в shell при вызове compose).
+
+SQLite хранится в именованном томе `**sqlite_data**` (путь в контейнере `**/app/data**`, файл задаётся `**NUXT_SQLITE_PATH=/app/data/ote.sqlite**` в compose). Полный список переменных для YC / TeamCity — в `**.env.example**`: при необходимости добавьте те же ключи в `**.env.docker**`.
+
+Образ: multi-stage сборка (`npm ci` → `npm run build` → `npm prune --omit=dev`), в финальном слое запуск `**node .output/server/index.mjs**`, слушает `**0.0.0.0:3000**`.
+
+### Выкат без копирования репозитория на сервер (как готовый `redis:7-alpine`)
+
+Идея: **на сервер попадает только образ из registry** плюс секреты (файл `.env.docker`), а не весь Git.
+
+1. **Там, где есть исходники** (ваш ПК или CI), один раз собрать и запушить образ:
+  ```bash
+   DOCKER_IMAGE=ghcr.io/<ваш_логин>/ote-manager:0.1.5 npm run docker:publish
+  ```
+   Это выполнит `docker build -t … .` и `docker push …`. Залогиньтесь в registry заранее (`docker login ghcr.io` и т.п.).
+2. **На сервере** — только pull и запуск. Минимум файлов: скопируйте `**.env.docker`** (из `**.env.docker.example`**) и при желании `**docker-compose.image.yml`**.
+  Через Compose (без `build`, без клона репо):
+   Или одной командой `**docker run**` (аналог вашего Redis): подставьте свой образ, порт и путь к env-файлу на хосте.
+   Именованный том `**ote_manager_sqlite**` хранит SQLite между перезапусками (как `**-v chat_redis_data:/data**` у Redis). Секреты и OAuth URL — только в `**--env-file**`, репозиторий на сервер не нужен.
 
 ## Структура репозитория
 
@@ -69,7 +98,12 @@ npm run dev
 ├── package.json
 ├── README.md
 ├── CONTRIBUTING.md
-└── .env.example
+├── Dockerfile
+├── docker-compose.yml
+├── docker-compose.image.yml  # только image (без build) для сервера
+├── .dockerignore
+├── .env.example
+└── .env.docker.example
 ```
 
 Слои внутри `src/`:
@@ -85,10 +119,10 @@ npm run dev
 
 ## Переменные: Yandex Cloud и TeamCity
 
-Кратко (полный список — в **`.env.example`**):
+Кратко (полный список — в `**.env.example**`):
 
 - **YC**: `NUXT_YC_FOLDER_ID`, ключ сервисного аккаунта (`NUXT_YC_SA_KEY_PATH` или `NUXT_YC_SERVICE_ACCOUNT_JSON`), метки ВМ (`NUXT_YC_INSTANCE_LABEL_KEY` и др.).
-- **TeamCity**: серверный PAT / логин-пароль **или** персональный токен пользователя в профиле; `NUXT_TC_*` — URL и build type id при необходимости.
+- **TeamCity**: серверный PAT / логин-пароль **или** персональный токен пользователя в профиле; `NUXT_TC_`* — URL и build type id при необходимости.
 - **«Мои окружения»** в списке: совпадение метки автора (`NUXT_YC_OTE_AUTHOR_LABEL`, по умолчанию `run-by`) с логином или почтой из сессии Яндекса.
 
 ## Git

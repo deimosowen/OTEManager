@@ -3,7 +3,7 @@ import { AUDIT_ACTION } from '@app-constants/audit.js'
 import { getDb } from '../db/client.js'
 import { oteTcCreations } from '../db/schema.js'
 import { auditPayloadFromUser, recordAuditEvent } from './audit-log.js'
-import { fetchTeamCityBuildJson, parseResultingPropertiesMap } from './teamcity/build-details.js'
+import { fetchTeamCityResultingPropertiesMap } from './teamcity/build-details.js'
 import { fetchTeamCityBuildSnapshot } from './teamcity/client.js'
 import { resolveTeamCityAuthorizationHeader } from './teamcity/resolve-auth.js'
 
@@ -59,6 +59,71 @@ function rowToPublic(row) {
 
 function activeRowFilter(id) {
   return and(eq(oteTcCreations.id, id), inArray(oteTcCreations.status, ACTIVE_STATUSES))
+}
+
+/**
+ * Извлечь поля для БД из карты resulting properties TeamCity (и при необходимости из JSON deployment_result).
+ * @param {Record<string, string>} map
+ */
+function extractOteTcCreationOutcome(map) {
+  const pick = (/** @type {string[]} */ keys) => {
+    for (const k of keys) {
+      const v = map[k]
+      if (v != null && String(v).trim()) return String(v).trim()
+    }
+    return null
+  }
+
+  let deploymentResultJson = pick(['deployment_result.json', 'deployment_result_json'])
+
+  let rabbitUrl = pick([
+    'deployment_result.rabbit_url',
+    'deployment_result.rabbitUrl',
+    'rabbit_url',
+    'rabbitUrl',
+  ])
+  let saasAppUrl = pick([
+    'deployment_result.saas_app_url',
+    'deployment_result.saasAppUrl',
+    'saas_app_url',
+    'saasAppUrl',
+  ])
+  let caseoneUrl = pick([
+    'deployment_result.caseone_url',
+    'deployment_result.caseoneUrl',
+    'caseone_url',
+    'caseoneUrl',
+    'app_url',
+    'app.url',
+  ])
+
+  if (deploymentResultJson) {
+    try {
+      const drRaw = JSON.parse(deploymentResultJson)
+      if (drRaw && typeof drRaw === 'object') {
+        const dr =
+          'deployment_result' in drRaw && drRaw.deployment_result && typeof drRaw.deployment_result === 'object'
+            ? drRaw.deployment_result
+            : drRaw
+        const r = (/** @type {unknown} */ x) =>
+          x != null && String(x).trim() ? String(x).trim() : null
+        rabbitUrl = rabbitUrl || r(dr.rabbit_url) || r(dr.rabbitUrl)
+        saasAppUrl = saasAppUrl || r(dr.saas_app_url) || r(dr.saasAppUrl)
+        caseoneUrl = caseoneUrl || r(dr.caseone_url) || r(dr.caseoneUrl) || r(dr.app_url)
+      }
+    } catch {
+      /* только плоские ключи map */
+    }
+  }
+
+  return {
+    metadataTag: pick(['metadata.tag']) || null,
+    caseoneVersion: pick(['caseone.version']) || null,
+    deploymentResultJson: deploymentResultJson || null,
+    rabbitUrl: rabbitUrl || null,
+    saasAppUrl: saasAppUrl || null,
+    caseoneUrl: caseoneUrl || null,
+  }
 }
 
 /**
@@ -157,12 +222,9 @@ export async function syncOteTcCreationRow(config, user, row) {
     return rowToPublic(r || row)
   }
 
-  const details = await fetchTeamCityBuildJson({ config, buildId, authorization })
-  if (!details.buildRoot || details.httpStatus !== 200) {
-    const err =
-      details.httpStatus !== 200
-        ? `TeamCity HTTP ${details.httpStatus}: не удалось загрузить сборку для чтения параметров`
-        : 'Пустой ответ сборки TeamCity'
+  const props = await fetchTeamCityResultingPropertiesMap({ config, buildId, authorization })
+  if (props.httpStatus !== 200) {
+    const err = `TeamCity HTTP ${props.httpStatus}: не удалось загрузить resulting properties сборки`
     const [updated] = await db
       .update(oteTcCreations)
       .set({
@@ -183,7 +245,8 @@ export async function syncOteTcCreationRow(config, user, row) {
             teamcityBuildId: buildId,
             teamcityWebUrl: row.teamcityWebUrl || null,
             reason: 'resulting_properties_unavailable',
-            httpStatus: details.httpStatus,
+            httpStatus: props.httpStatus,
+            raw: props.raw || null,
           },
         }),
       )
@@ -192,13 +255,8 @@ export async function syncOteTcCreationRow(config, user, row) {
     return rowToPublic(r || row)
   }
 
-  const map = parseResultingPropertiesMap(details.buildRoot)
-  const metadataTag = map['metadata.tag'] || null
-  const caseoneVersion = map['caseone.version'] || null
-  const deploymentResultJson = map['deployment_result.json'] || null
-  const rabbitUrl = map['deployment_result.rabbit_url'] || null
-  const saasAppUrl = map['deployment_result.saas_app_url'] || null
-  const caseoneUrl = map['deployment_result.caseone_url'] || null
+  const { metadataTag, caseoneVersion, deploymentResultJson, rabbitUrl, saasAppUrl, caseoneUrl } =
+    extractOteTcCreationOutcome(props.map)
 
   const [updated] = await db
     .update(oteTcCreations)

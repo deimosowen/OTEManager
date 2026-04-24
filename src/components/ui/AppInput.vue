@@ -1,6 +1,18 @@
 <template>
   <div class="w-full">
-    <label v-if="label" class="mb-1.5 block text-sm font-bold text-slate-800">{{ label }}</label>
+    <AppTooltip v-if="label && labelTitle" :content="labelTitle">
+      <template #default="{ describedBy }">
+        <label
+          :aria-describedby="describedBy || undefined"
+          class="mb-1.5 block cursor-help text-sm font-bold text-slate-800 underline decoration-dotted decoration-slate-400 underline-offset-2 hover:decoration-slate-500"
+        >
+          {{ label }}
+        </label>
+      </template>
+    </AppTooltip>
+    <label v-else-if="label" class="mb-1.5 block text-sm font-bold text-slate-800">
+      {{ label }}
+    </label>
     <input
       v-bind="$attrs"
       :value="modelValue"
@@ -13,6 +25,8 @@
 <script setup>
 defineProps({
   label: { type: String, default: '' },
+  /** Подсказка при наведении на лейбл (например, имя параметра TeamCity). */
+  labelTitle: { type: String, default: '' },
   modelValue: { type: String, default: '' },
 })
 defineEmits(['update:modelValue'])

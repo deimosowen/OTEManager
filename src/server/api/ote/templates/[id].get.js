@@ -1,7 +1,9 @@
 import { eq } from 'drizzle-orm'
 import { getDb } from '../../../db/client.js'
 import { oteDeploymentTemplates } from '../../../db/schema.js'
+import { rowIsPersonal } from '../../../utils/deployment-template-access.js'
 import { mapDeploymentTemplateFull } from '../../../utils/deployment-template-map.js'
+import { integrationUserKey } from '../../../utils/integrations/user-credentials.js'
 import { requireOteUser } from '../../../utils/require-ote-auth.js'
 
 function parseTemplateId(raw) {
@@ -11,7 +13,8 @@ function parseTemplateId(raw) {
 }
 
 export default defineEventHandler(async (event) => {
-  requireOteUser(event)
+  const user = requireOteUser(event)
+  const login = integrationUserKey(user)
   const id = parseTemplateId(event.context.params?.id)
   if (!id) {
     throw createError({ statusCode: 400, message: 'Некорректный id' })
@@ -21,6 +24,9 @@ export default defineEventHandler(async (event) => {
   const row = rows[0]
   if (!row) {
     throw createError({ statusCode: 404, message: 'Шаблон не найден' })
+  }
+  if (rowIsPersonal(row.isPersonal) && row.createdByLogin !== login) {
+    throw createError({ statusCode: 403, message: 'Этот шаблон личный и доступен только автору' })
   }
   return { template: mapDeploymentTemplateFull(row) }
 })

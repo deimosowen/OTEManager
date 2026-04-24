@@ -1,5 +1,6 @@
 {
   "name": "ote-manager",
+  "version": "0.1.5",
   "private": true,
   "type": "module",
   "engines": {
@@ -17,7 +18,8 @@
     "postinstall": "nuxt prepare",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "docker:publish": "node scripts/docker-publish.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",

@@ -127,10 +127,19 @@
         </tbody>
       </table>
     </div>
+
+    <OteDeleteConfirmModal
+      v-model="deleteModalOpen"
+      :ote-label="pendingDeleteLabel"
+      variant="yc"
+      :confirm-loading="pendingDeleteLoading"
+      @confirm="onDeleteConfirm"
+    />
   </div>
 </template>
 
 <script setup>
+import { computed, reactive, ref, watch } from 'vue'
 import {
   ChevronRight,
   Loader2,
@@ -140,7 +149,6 @@ import {
   Trash2,
   UserRound,
 } from 'lucide-vue-next'
-import { reactive } from 'vue'
 import { $fetch } from 'ofetch'
 import { notifyOteInstancesRefresh } from '~/composables/useOteInstancesBroadcast'
 import { OTE_STATUS } from '~/constants/ote'
@@ -154,6 +162,25 @@ const router = useRouter()
 const rt = useRuntimeConfig()
 const toast = useToast()
 const envStore = useEnvironmentsStore()
+
+const deleteModalOpen = ref(false)
+const pendingDeleteRow = ref(/** @type {Record<string, unknown> | null} */ (null))
+
+const pendingDeleteLabel = computed(() => {
+  const row = pendingDeleteRow.value
+  if (!row) return ''
+  return String(row.oteName || row.name || row.id || '')
+})
+
+const pendingDeleteLoading = computed(() => {
+  const row = pendingDeleteRow.value
+  if (!row?.id) return false
+  return isBusy(row.id, 'delete')
+})
+
+watch(deleteModalOpen, (open) => {
+  if (!open) pendingDeleteRow.value = null
+})
 
 /** @type {Record<string, boolean>} */
 const busy = reactive({})
@@ -271,16 +298,20 @@ async function runTeamCity(row, action) {
   }
 }
 
-async function runDelete(row) {
+function runDelete(row) {
   const id = row.id
   if (!id || row.status === OTE_STATUS.DELETING || row.tcOperationPending) return
-  const name = row.oteName || row.name || id
-  if (
-    !window.confirm(
-      `Удалить OTE «${name}»? В TeamCity будет поставлена сборка удаления по metadata.tag (как старт/стоп). Действие необратимо после выполнения сценария.`,
-    )
-  )
+  pendingDeleteRow.value = row
+  deleteModalOpen.value = true
+}
+
+async function onDeleteConfirm() {
+  const row = pendingDeleteRow.value
+  if (!row?.id) {
+    deleteModalOpen.value = false
     return
+  }
+  const id = row.id
   setBusy(id, 'delete', true)
   try {
     const res = await $fetch(`/api/ote/instances/${encodeURIComponent(id)}/teamcity`, {
@@ -290,6 +321,8 @@ async function runDelete(row) {
     })
     const buildId = res?.teamCity?.buildId
     toast.show(`Сборка удаления в TeamCity поставлена в очередь${buildId ? ` (#${buildId})` : ''}.`, 'success')
+    deleteModalOpen.value = false
+    pendingDeleteRow.value = null
     try {
       await envStore.refreshFromYandexApi()
     } catch {

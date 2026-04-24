@@ -394,7 +394,19 @@ export function buildOteAppLinkSet(members, labelKey, opts = {}) {
 }
 
 /**
+ * Локальная часть идентификатора до `@` (у корп. почты логин часто совпадает с ней целиком, а на ВМ — только local-part).
+ * @param {string} s
+ */
+function actorIdentityLocalPart(s) {
+  const t = String(s || '').trim().toLowerCase()
+  if (!t) return ''
+  const at = t.indexOf('@')
+  return at > 0 ? t.slice(0, at) : t
+}
+
+/**
  * «Мои окружения»: совпадение метки автора (run-by) с логином или почтой из сессии.
+ * Учитываются полная строка и часть до `@`, а также `DOMAIN\\user` и `user@…` в run-by.
  * @param {string} runBy
  * @param {{ login?: string, email?: string } | null | undefined} actor
  */
@@ -404,13 +416,27 @@ export function computeOteRowMine(runBy, actor) {
   if (!rb) return false
   const login = String(actor.login || '').trim().toLowerCase()
   const email = String(actor.email || '').trim().toLowerCase()
-  if (login && rb === login) return true
-  if (email && rb === email) return true
-  if (login) {
-    const bs = rb.lastIndexOf('\\')
-    if (bs >= 0 && rb.slice(bs + 1) === login) return true
-    const at = rb.indexOf('@')
-    if (at > 0 && rb.slice(0, at) === login) return true
+
+  /** @type {Set<string>} */
+  const ids = new Set()
+  for (const raw of [login, email]) {
+    if (!raw) continue
+    ids.add(raw)
+    const local = actorIdentityLocalPart(raw)
+    if (local) ids.add(local)
+  }
+
+  if (ids.has(rb)) return true
+
+  const bs = rb.lastIndexOf('\\')
+  if (bs >= 0) {
+    const short = rb.slice(bs + 1)
+    if (ids.has(short)) return true
+  }
+  const at = rb.indexOf('@')
+  if (at > 0) {
+    const short = rb.slice(0, at)
+    if (ids.has(short)) return true
   }
   return false
 }
@@ -906,31 +932,7 @@ export function pickTcConfigFromMembers(members, metaKeys, labelKeys) {
 }
 
 /**
- * История развёртываний из metadata (JSON-массив или объект с полем history).
- * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[]} members
- * @param {string} metaKey
- */
-export function parseDeploymentHistoryFromMembers(members, metaKey) {
-  if (!metaKey || !String(metaKey).trim()) return []
-  const raw = preferAppMembersFirst(members)[0]?.metadata?.[metaKey]
-  if (raw == null || !String(raw).trim()) return []
-  try {
-    const j = JSON.parse(String(raw))
-    const arr = Array.isArray(j) ? j : j?.history
-    if (!Array.isArray(arr)) return []
-    return arr.map((e) => ({
-      at: e.at || e.time || e.deployedAt || '',
-      versionBackend: e.versionBackend || e.backend || e.caseoneVersion || '',
-      versionFrontend: e.versionFrontend || e.frontend || e.uiVersion || '',
-      note: e.note || e.message || '',
-    }))
-  } catch {
-    return []
-  }
-}
-
-/**
- * Поля карточки OTE для UI: MVP + таблица ВМ + конфиг ТС + история (из метаданных при наличии).
+ * Поля карточки OTE для UI: MVP + таблица ВМ + конфиг ТС (из метаданных при наличии).
  * @param {Record<string, unknown>} row
  * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[]} members
  * @param {string} labelKey
@@ -940,7 +942,6 @@ export function enrichOteDetailItem(row, members, labelKey, mvp, actor = null) {
   const merged = attachMvpFields({ ...row }, members, mvp, labelKey, actor)
   merged.vmBuildLogRows = members.map((inst) => mapInstanceToBuildLogRow(inst, mvp))
   merged.tcConfigText = pickTcConfigFromMembers(members, mvp.tcConfigMetaKeys || [], mvp.tcConfigLabelKeys || [])
-  merged.deploymentHistory = parseDeploymentHistoryFromMembers(members, mvp.deploymentHistoryMetaKey || '')
   merged.source = 'yc'
   return merged
 }

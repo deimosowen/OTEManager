@@ -1,6 +1,18 @@
 <template>
   <div class="min-w-0">
-    <label v-if="label" class="mb-1.5 block text-sm font-bold text-slate-800">{{ label }}</label>
+    <AppTooltip v-if="label && labelTitle" :content="labelTitle">
+      <template #default="{ describedBy }">
+        <label
+          :aria-describedby="describedBy || undefined"
+          class="mb-1.5 block cursor-help text-sm font-bold text-slate-800 underline decoration-dotted decoration-slate-400 underline-offset-2 hover:decoration-slate-500"
+        >
+          {{ label }}
+        </label>
+      </template>
+    </AppTooltip>
+    <label v-else-if="label" class="mb-1.5 block text-sm font-bold text-slate-800">
+      {{ label }}
+    </label>
     <div class="relative">
       <select
         :value="modelValue"
@@ -24,6 +36,8 @@ import { ChevronDown } from 'lucide-vue-next'
 
 defineProps({
   label: { type: String, default: '' },
+  /** Подсказка при наведении на лейбл (например, имя параметра TeamCity). */
+  labelTitle: { type: String, default: '' },
   modelValue: { type: [String, Number], default: '' },
   /** @type {{ value: string, label: string }[]} */
   options: { type: Array, default: () => [] },

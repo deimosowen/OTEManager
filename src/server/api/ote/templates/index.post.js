@@ -1,7 +1,9 @@
 import { AUDIT_ACTION } from '@app-constants/audit.js'
+import { parseDeploymentTemplateOsValue } from '@app-constants/deployment-template-os.js'
 import { getDb } from '../../../db/client.js'
 import { oteDeploymentTemplates } from '../../../db/schema.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../utils/audit-log.js'
+import { parseIsPersonalFromBody, rowIsPersonal } from '../../../utils/deployment-template-access.js'
 import { mapDeploymentTemplateFull } from '../../../utils/deployment-template-map.js'
 import { assertValidYamlString } from '../../../utils/deployment-template-yaml.js'
 import { integrationUserKey } from '../../../utils/integrations/user-credentials.js'
@@ -19,6 +21,8 @@ export default defineEventHandler(async (event) => {
     body && typeof body.description === 'string' ? body.description.trim().slice(0, 4000) : ''
   const yamlRaw = body && typeof body.yaml === 'string' ? body.yaml : ''
   const yamlBody = assertValidYamlString(yamlRaw)
+  const targetOs = parseDeploymentTemplateOsValue(body?.targetOs)
+  const isPersonal = parseIsPersonalFromBody(body) ? 1 : 0
 
   const db = getDb()
   const now = new Date()
@@ -29,8 +33,10 @@ export default defineEventHandler(async (event) => {
     .insert(oteDeploymentTemplates)
     .values({
       name,
+      targetOs,
       description: description || null,
       yamlBody,
+      isPersonal,
       createdAt: now,
       updatedAt: now,
       createdByLogin: login,
@@ -44,14 +50,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, message: 'Не удалось сохранить шаблон' })
   }
 
-  await recordAuditEvent(
-    auditPayloadFromUser(user, {
-      actionCode: AUDIT_ACTION.OTE_DEPLOY_TEMPLATE_CREATE,
-      oteResourceId: `deploy-template:${row.id}`,
-      oteTag: row.name,
-      details: { templateId: row.id, name: row.name },
-    }),
-  )
+  if (!rowIsPersonal(row.isPersonal)) {
+    await recordAuditEvent(
+      auditPayloadFromUser(user, {
+        actionCode: AUDIT_ACTION.OTE_DEPLOY_TEMPLATE_CREATE,
+        oteResourceId: `deploy-template:${row.id}`,
+        oteTag: row.name,
+        details: { templateId: row.id, name: row.name },
+      }),
+    )
+  }
 
   return { template: mapDeploymentTemplateFull(row) }
 })

@@ -1,4 +1,9 @@
+import { getDb } from '../../../db/client.js'
 import { requireOteUser } from '../../../utils/require-ote-auth.js'
+import {
+  fetchLatestOteTcCreationSummaryByMetadataTag,
+  fetchLatestTcYamlForOteMetadataTag,
+} from '../../../utils/ote-tc-config-from-db.js'
 import { runtimeConfigString } from '../../../utils/yc/config-helpers.js'
 import { createYandexCloudSession } from '../../../utils/yc/session.js'
 import {
@@ -53,6 +58,21 @@ export default defineEventHandler(async (event) => {
     const item = enrichOteDetailItem(row, filtered, labelKey, mvp)
     const pend = await resolveTcPendingState(id, filtered, config)
     item.tcOperationPending = pend || null
+    const tag = String(item.oteName || groupKey || '').trim()
+    if (tag) {
+      try {
+        const db = getDb()
+        if (!String(item.tcConfigText || '').trim()) {
+          const yaml = await fetchLatestTcYamlForOteMetadataTag(db, tag)
+          if (yaml) item.tcConfigText = yaml
+        }
+        item.oteTcCreationSummary = await fetchLatestOteTcCreationSummaryByMetadataTag(db, tag)
+      } catch {
+        item.oteTcCreationSummary = null
+      }
+    } else {
+      item.oteTcCreationSummary = null
+    }
     return { item }
   }
 
@@ -73,5 +93,20 @@ export default defineEventHandler(async (event) => {
   const item = enrichOteDetailItem(base, [inst], labelKey, mvp, { login: user.login || '', email: user.email || '' })
   const pend = await resolveTcPendingState(id, [inst], config)
   item.tcOperationPending = pend || null
+  const tag = String(item.oteName || labels[labelKey] || '').trim()
+  if (tag) {
+    try {
+      const db = getDb()
+      if (!String(item.tcConfigText || '').trim()) {
+        const yaml = await fetchLatestTcYamlForOteMetadataTag(db, tag)
+        if (yaml) item.tcConfigText = yaml
+      }
+      item.oteTcCreationSummary = await fetchLatestOteTcCreationSummaryByMetadataTag(db, tag)
+    } catch {
+      item.oteTcCreationSummary = null
+    }
+  } else {
+    item.oteTcCreationSummary = null
+  }
   return { item }
 })

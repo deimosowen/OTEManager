@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 
 const srcDir = fileURLToPath(new URL('./src', import.meta.url))
+const constantsDir = fileURLToPath(new URL('./src/constants', import.meta.url))
 
 /**
  * Vitest без полного Nuxt-рантайма: алиасы как в приложении (`~/` → `src/`).
@@ -22,6 +23,7 @@ export default defineConfig({
     alias: {
       '~': srcDir,
       '@': srcDir,
+      '@app-constants': constantsDir,
     },
   },
 })

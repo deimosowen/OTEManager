@@ -1,27 +1,17 @@
 <template>
-  <Teleport to="body">
-    <div
-      v-if="deleteModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="ote-delete-title"
-      @click.self="deleteModalOpen = false"
-    >
-      <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
-        <h2 id="ote-delete-title" class="text-lg font-extrabold text-slate-900">Удалить OTE?</h2>
-        <p class="mt-2 text-sm font-semibold text-slate-600">
-          В TeamCity будет поставлена сборка удаления по тому же параметру metadata.tag, что и для старта/остановки.
-          Дальнейшее выполнение — по сценарию в TeamCity; в интерфейсе появится ожидание до завершения сборки.
-        </p>
-        <p v-if="env" class="mt-2 truncate font-mono text-xs text-slate-500">{{ displayTitle }}</p>
-        <div class="mt-6 flex flex-wrap justify-end gap-2">
-          <AppButton variant="secondary" :disabled="deleteBusy" @click="deleteModalOpen = false">Отмена</AppButton>
-          <AppButton variant="danger" :loading="deleteBusy" @click="confirmDelete">Удалить</AppButton>
-        </div>
-      </div>
-    </div>
-  </Teleport>
+  <OteDeleteConfirmModal
+    v-model="deleteModalOpen"
+    :ote-label="displayTitle"
+    variant="yc"
+    :confirm-loading="deleteBusy"
+    @confirm="confirmDelete"
+  />
+  <OteDeleteConfirmModal
+    v-model="seedDeleteModalOpen"
+    :ote-label="displayTitle"
+    variant="seed"
+    @confirm="confirmSeedDelete"
+  />
 
   <div v-if="env">
     <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
@@ -172,13 +162,105 @@
             <Play v-else class="size-3.5" />
             {{ env.status === 'running' ? 'Остановить' : 'Запустить' }}
           </AppButton>
-          <AppButton variant="danger" size="md" @click="removeSeed">
+          <AppButton variant="danger" size="md" @click="seedDeleteModalOpen = true">
             <Trash2 class="size-3.5" />
             Удалить
           </AppButton>
         </template>
       </div>
     </div>
+
+    <section
+      v-if="isYc && oteTcCreationSummary"
+      class="mb-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-card"
+    >
+      <h2 class="mb-3 text-[15px] font-extrabold text-slate-900">Создание OTE через TeamCity</h2>
+      <p class="text-sm font-semibold text-slate-600">
+        Запрос #{{ oteTcCreationSummary.id }} · статус:
+        <span :class="oteTcCreationStatusClass(oteTcCreationSummary.status)">{{
+          oteTcCreationStatusLabel(oteTcCreationSummary.status)
+        }}</span>
+      </p>
+      <p v-if="oteTcCreationSummary.lastError" class="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-800">
+        {{ oteTcCreationSummary.lastError }}
+      </p>
+      <div v-if="oteTcCreationSummary.teamcityWebUrl" class="mt-4">
+        <a
+          :href="oteTcCreationSummary.teamcityWebUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1.5 text-sm font-bold text-brand hover:underline"
+        >
+          <ExternalLink class="size-4" aria-hidden="true" />
+          Открыть сборку в TeamCity
+        </a>
+      </div>
+      <dl class="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+        <div v-if="oteTcCreationSummary.presetId">
+          <dt class="font-bold text-slate-700">Пресет</dt>
+          <dd class="mt-0.5 font-mono text-xs text-slate-600">{{ oteTcCreationSummary.presetId }}</dd>
+        </div>
+        <div v-if="oteTcCreationSummary.createdAt">
+          <dt class="font-bold text-slate-700">Создан запрос</dt>
+          <dd class="mt-0.5 font-mono text-xs text-slate-600">{{ formatTcCreationUtc(oteTcCreationSummary.createdAt) }}</dd>
+        </div>
+        <div v-if="oteTcCreationSummary.actorLogin || oteTcCreationSummary.actorEmail">
+          <dt class="font-bold text-slate-700">Инициатор</dt>
+          <dd class="mt-0.5 text-xs text-slate-600">
+            <span class="font-semibold">{{ oteTcCreationSummary.actorLogin || '—' }}</span>
+            <span v-if="oteTcCreationSummary.actorEmail" class="mt-0.5 block truncate font-mono text-[11px] text-slate-500">{{
+              oteTcCreationSummary.actorEmail
+            }}</span>
+          </dd>
+        </div>
+        <div v-if="oteTcCreationSummary.metadataTag">
+          <dt class="font-bold text-slate-700">metadata.tag</dt>
+          <dd class="mt-0.5 font-mono text-xs text-slate-600">{{ oteTcCreationSummary.metadataTag }}</dd>
+        </div>
+        <div v-if="oteTcCreationSummary.caseoneVersion">
+          <dt class="font-bold text-slate-700">caseone.version</dt>
+          <dd class="mt-0.5 font-mono text-xs text-slate-600">{{ oteTcCreationSummary.caseoneVersion }}</dd>
+        </div>
+      </dl>
+      <dl v-if="oteTcCreationHasOutcomeLinks" class="mt-4 space-y-3 border-t border-slate-100 pt-4 text-sm">
+        <div v-if="oteTcCreationSummary.caseoneUrl">
+          <dt class="font-bold text-slate-700">CaseOne</dt>
+          <dd class="mt-0.5">
+            <a
+              :href="oteTcCreationSummary.caseoneUrl"
+              class="break-all font-semibold text-brand hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ oteTcCreationSummary.caseoneUrl }}</a
+            >
+          </dd>
+        </div>
+        <div v-if="oteTcCreationSummary.saasAppUrl">
+          <dt class="font-bold text-slate-700">SaaS приложение</dt>
+          <dd class="mt-0.5">
+            <a
+              :href="oteTcCreationSummary.saasAppUrl"
+              class="break-all font-semibold text-brand hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+              >{{ oteTcCreationSummary.saasAppUrl }}</a
+            >
+          </dd>
+        </div>
+        <div v-if="oteTcCreationSummary.rabbitUrl">
+          <dt class="font-bold text-slate-700">RabbitMQ</dt>
+          <dd class="mt-0.5 break-all font-mono text-xs text-slate-600">{{ oteTcCreationSummary.rabbitUrl }}</dd>
+        </div>
+      </dl>
+      <details v-if="deploymentResultPretty" class="mt-4 border-t border-slate-100 pt-4">
+        <summary class="cursor-pointer text-sm font-extrabold text-slate-800 [&::-webkit-details-marker]:hidden">
+          deployment_result (JSON)
+        </summary>
+        <div class="mt-3">
+          <AppCodeBlockWithLineNumbers :text="deploymentResultPretty" max-height-class="max-h-[320px]" />
+        </div>
+      </details>
+    </section>
 
     <template v-if="isYc">
       <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -256,30 +338,28 @@
           </div>
         </section>
 
-        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card lg:col-span-2">
-          <h2 class="mb-4 text-[15px] font-extrabold text-slate-900">Конфигурация для TeamCity</h2>
-          <p class="mb-3 text-sm text-slate-600">Текст/JSON из metadata или меток (первый непустой по настройке каталога).</p>
-          <pre
-            v-if="tcConfigText"
-            class="max-h-[420px] overflow-auto rounded-xl border border-slate-100 bg-slate-50 p-4 font-mono text-xs leading-relaxed text-slate-800"
-            >{{ tcConfigText }}</pre
+        <details
+          class="group rounded-2xl border border-slate-200 bg-white shadow-card lg:col-span-2 [&_summary::-webkit-details-marker]:hidden"
+        >
+          <summary
+            class="flex cursor-pointer list-none items-center gap-2 px-6 py-4 text-left transition hover:bg-slate-50/80"
           >
-          <div v-else class="text-sm font-semibold text-slate-500">Конфиг в метаданных не найден</div>
-        </section>
-
-        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card lg:col-span-2">
-          <h2 class="mb-4 text-[15px] font-extrabold text-slate-900">История развёртываний</h2>
-          <div v-if="!deploymentRows.length" class="text-sm font-semibold text-slate-500">Записей нет</div>
-          <ul v-else class="divide-y divide-slate-100 rounded-xl border border-slate-100">
-            <li v-for="(d, i) in deploymentRows" :key="i" class="flex flex-wrap gap-x-4 gap-y-1 px-4 py-3 text-sm">
-              <span class="font-mono text-xs font-semibold text-slate-500">{{ d.at || '—' }}</span>
-              <span class="font-mono text-xs text-slate-800"
-                >бек {{ d.versionBackend || '—' }} / фронт {{ d.versionFrontend || '—' }}</span
-              >
-              <span v-if="d.note" class="w-full text-xs text-slate-600">{{ d.note }}</span>
-            </li>
-          </ul>
-        </section>
+            <ChevronRight
+              class="size-4 shrink-0 text-slate-500 transition-transform duration-200 group-open:rotate-90"
+              aria-hidden="true"
+            />
+            <h2 class="text-[15px] font-extrabold text-slate-900">Конфигурация для TeamCity</h2>
+            <span v-if="tcConfigText" class="ml-auto text-xs font-semibold text-slate-400">{{ tcConfigLineCount }} строк</span>
+          </summary>
+          <div class="border-t border-slate-100 px-6 pb-6 pt-4">
+            <p class="mb-3 text-sm text-slate-600">
+              Текст или JSON из metadata или меток ВМ; если там пусто — подставляется сохранённый при создании OTE шаблон
+              <span class="font-mono text-xs">default_deploymet_config_template</span> из базы (по метке OTE).
+            </p>
+            <AppCodeBlockWithLineNumbers v-if="tcConfigText" :text="tcConfigText" />
+            <div v-else class="text-sm font-semibold text-slate-500">Конфиг не найден в метаданных и в сохранённых запросах TeamCity</div>
+          </div>
+        </details>
       </div>
     </template>
 
@@ -408,7 +488,8 @@
         <AppButton variant="secondary" size="sm" class="!text-xs" :loading="oteAuditLoading" @click="loadOteAudit">Обновить</AppButton>
       </div>
       <p class="mb-3 text-xs font-semibold text-slate-500">
-        UTC. Поиск по логину, почте и метке.
+        UTC. В выборку входят события по id карточки и по метке OTE (metadata.tag), в т.ч. создание через TeamCity.
+        Поиск — по логину, почте и метке.
       </p>
       <div class="mb-4 flex flex-wrap items-end gap-2">
         <div class="min-w-[140px] flex-1 sm:max-w-[200px]">
@@ -511,6 +592,7 @@
 import {
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Clock,
   ExternalLink,
   Loader2,
@@ -527,6 +609,7 @@ import { $fetch } from 'ofetch'
 import { useEnvironmentsStore } from '~/stores/environments'
 import { OTE_STATUS, OTE_STATUS_LABELS } from '~/constants/ote'
 import { formatDateRu } from '~/utils/date'
+import { oteTcCreationStatusClass, oteTcCreationStatusLabel } from '~/utils/ote-tc-creation-status.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -537,6 +620,7 @@ const rt = useRuntimeConfig()
 const SHOW_YC_LABELS_ON_DETAIL = false
 
 const deleteModalOpen = ref(false)
+const seedDeleteModalOpen = ref(false)
 const deleteBusy = ref(false)
 /** '' | 'start' | 'stop' — запрос к TeamCity с карточки */
 const tcBusy = ref('')
@@ -551,6 +635,14 @@ const oteAuditFilterDateFrom = ref('')
 const oteAuditFilterDateTo = ref('')
 
 const oteAuditTotalPages = computed(() => Math.max(1, Math.ceil(oteAuditTotal.value / AUDIT_LIST_PAGE_SIZE)))
+
+/** metadata.tag (карточка `oteName`) — для аудита вместе с id карточки (события создания идут с `ote_tag`). */
+const oteAuditTagQueryParam = computed(() => {
+  const e = env.value
+  if (!e || e.source !== 'yc') return ''
+  const t = e.oteName
+  return typeof t === 'string' && t.trim() ? t.trim() : ''
+})
 
 const oteAuditDebounceSec = computed(() => Math.round(AUDIT_SEARCH_DEBOUNCE_MS / 1000))
 
@@ -635,11 +727,39 @@ const tcConfigText = computed(() => {
   return typeof t === 'string' ? t : ''
 })
 
-const deploymentRows = computed(() => {
-  const e = env.value
-  if (!e || !Array.isArray(e.deploymentHistory)) return []
-  return e.deploymentHistory
+const tcConfigLineCount = computed(() => {
+  const s = tcConfigText.value
+  if (!s) return 0
+  return s.split('\n').length
 })
+
+const oteTcCreationSummary = computed(() => {
+  const o = env.value?.oteTcCreationSummary
+  return o && typeof o === 'object' ? o : null
+})
+
+const deploymentResultPretty = computed(() => {
+  const raw = oteTcCreationSummary.value?.deploymentResultJson
+  if (raw == null || typeof raw !== 'string' || !raw.trim()) return ''
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2)
+  } catch {
+    return raw
+  }
+})
+
+const oteTcCreationHasOutcomeLinks = computed(() => {
+  const s = oteTcCreationSummary.value
+  if (!s) return false
+  return Boolean(s.caseoneUrl || s.saasAppUrl || s.rabbitUrl)
+})
+
+function formatTcCreationUtc(iso) {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return String(iso)
+  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' Z')
+}
 
 const labelSections = computed(() => {
   const e = env.value
@@ -729,6 +849,7 @@ async function loadOteAudit() {
         ...(searchQuery.value ? { search: searchQuery.value } : {}),
         ...(oteAuditFilterDateFrom.value ? { dateFrom: oteAuditFilterDateFrom.value } : {}),
         ...(oteAuditFilterDateTo.value ? { dateTo: oteAuditFilterDateTo.value } : {}),
+        ...(oteAuditTagQueryParam.value ? { oteTag: oteAuditTagQueryParam.value } : {}),
       },
     })
     oteAuditRows.value = Array.isArray(res?.items) ? res.items : []
@@ -840,10 +961,7 @@ async function confirmDelete() {
     })
     const buildId = res?.teamCity?.buildId
     deleteModalOpen.value = false
-    toast.show(
-      `Сборка удаления в TeamCity поставлена в очередь${buildId ? ` (#${buildId})` : ''}. Дождитесь завершения или обновите список.`,
-      'success',
-    )
+    toast.show(`Сборка удаления в TeamCity поставлена в очередь${buildId ? ` (#${buildId})` : ''}.`, 'success')
     await loadDetail()
     try {
       await store.refreshFromYandexApi()
@@ -868,12 +986,15 @@ function toggleSeed() {
   toast.show(running ? 'Окружение остановлено' : 'Окружение запущено', 'success')
 }
 
-function removeSeed() {
+function confirmSeedDelete() {
   const e = env.value
-  if (!e) return
-  if (!window.confirm(`Удалить OTE «${e.name}»?`)) return
+  if (!e) {
+    seedDeleteModalOpen.value = false
+    return
+  }
   store.remove(e.id)
   toast.show(`OTE «${e.name}» удалена`, 'error')
+  seedDeleteModalOpen.value = false
   router.push('/')
 }
 </script>

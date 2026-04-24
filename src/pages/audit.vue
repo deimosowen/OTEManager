@@ -5,10 +5,6 @@
       <AppButton variant="secondary" size="md" :loading="loading" @click="load">Обновить</AppButton>
     </div>
 
-    <p class="mb-3 text-sm font-semibold text-slate-600">
-      Время — <span class="font-mono">UTC</span>. Поиск по строке — по логину, почте, метке и id OTE (пауза {{ debounceSec }} с после ввода).
-    </p>
-
     <div class="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-card">
       <div class="min-w-[160px] flex-1 sm:max-w-[220px]">
         <AppSelect v-model="filterAction" label="Действие" :options="AUDIT_ACTION_FILTER_OPTIONS" />
@@ -38,7 +34,7 @@
           type="search"
           autocomplete="off"
           class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
-          placeholder="Логин, почта, метка или id OTE…"
+          placeholder="Логин, почта, тег, id ресурса…"
         />
       </div>
     </div>
@@ -56,8 +52,8 @@
               <th class="px-4 py-3">Действие</th>
               <th class="px-4 py-3">Логин</th>
               <th class="px-4 py-3">Почта</th>
-              <th class="px-4 py-3">Метка OTE</th>
-              <th class="px-4 py-3">Id OTE</th>
+              <th class="px-4 py-3">Метка / тег</th>
+              <th class="px-4 py-3">Ресурс</th>
             </tr>
           </thead>
           <tbody>
@@ -134,7 +130,7 @@ function labelFor(code) {
   return auditActionLabel(code)
 }
 
-/** Ссылка из колонки «Id OTE»: шаблоны деплоя → /templates/:id */
+/** Ссылка из колонки «Ресурс»: шаблоны деплоя → /templates/:id, иначе карточка OTE */
 function resourceHref(oteResourceId) {
   if (!oteResourceId) return '/'
   const s = String(oteResourceId)

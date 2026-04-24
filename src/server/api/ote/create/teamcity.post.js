@@ -1,12 +1,13 @@
 import { AUDIT_ACTION } from '@app-constants/audit.js'
 import { getOteCreationPreset } from '@app-constants/ote-creation-presets.js'
-import { eq } from 'drizzle-orm'
 import { getDb } from '../../../db/client.js'
-import { oteDeploymentTemplates, oteTcCreations } from '../../../db/schema.js'
+import { oteTcCreations } from '../../../db/schema.js'
+import { fetchDeploymentTemplateYamlIfVisible } from '../../../utils/deployment-template-access.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../utils/audit-log.js'
 import { integrationUserKey } from '../../../utils/integrations/user-credentials.js'
 import { rowToPublic } from '../../../utils/ote-tc-creation-sync.js'
 import { requireOteUser } from '../../../utils/require-ote-auth.js'
+import { parseDeploymentTemplateId } from '../../../utils/ote-create-deployment-template-id.js'
 import { queueTeamCityBuild } from '../../../utils/teamcity/client.js'
 import { isTeamCityAuthAvailable, resolveTeamCityAuthorizationHeader } from '../../../utils/teamcity/resolve-auth.js'
 
@@ -15,19 +16,6 @@ import { isTeamCityAuthAvailable, resolveTeamCityAuthorizationHeader } from '../
  * Тело: `{ presetId, properties, deploymentTemplateId? }`.
  * Если задан `deploymentTemplateId`, для поля `default_deploymet_config_template` в TeamCity подставляется YAML из БД.
  */
-function parseDeploymentTemplateId(raw) {
-  if (raw == null) return null
-  if (typeof raw === 'number' && Number.isFinite(raw)) {
-    const n = Math.trunc(raw)
-    return n > 0 ? n : null
-  }
-  if (typeof raw === 'string' && /^\d+$/.test(raw.trim())) {
-    const n = parseInt(raw.trim(), 10)
-    return Number.isFinite(n) && n > 0 ? n : null
-  }
-  return null
-}
-
 export default defineEventHandler(async (event) => {
   const user = requireOteUser(event)
   const config = useRuntimeConfig(event)
@@ -54,21 +42,16 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = getDb()
+  const userKey = integrationUserKey(user)
 
   /** YAML из каталога шаблонов (целиком уходит в default_deploymet_config_template в TeamCity). */
   let injectedTemplateYaml = null
   const presetUsesTemplateCatalog = preset.fields.some((f) => f.type === 'template_select')
   if (deploymentTemplateId && presetUsesTemplateCatalog) {
-    const rows = await db
-      .select({ yamlBody: oteDeploymentTemplates.yamlBody })
-      .from(oteDeploymentTemplates)
-      .where(eq(oteDeploymentTemplates.id, deploymentTemplateId))
-      .limit(1)
-    const row = rows[0]
-    if (!row) {
-      throw createError({ statusCode: 400, message: 'Шаблон не найден' })
+    const yamlStr = await fetchDeploymentTemplateYamlIfVisible(db, deploymentTemplateId, userKey)
+    if (!yamlStr) {
+      throw createError({ statusCode: 400, message: 'Шаблон не найден или недоступен' })
     }
-    const yamlStr = row.yamlBody != null ? String(row.yamlBody) : ''
     if (!yamlStr.trim()) {
       throw createError({ statusCode: 400, message: 'У шаблона пустой YAML' })
     }

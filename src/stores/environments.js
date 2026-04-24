@@ -9,6 +9,44 @@ function newId(list) {
   return String(max + 1)
 }
 
+/** Поля карточки, которых нет в «лёгком» ответе списка — не затирать при refresh списка. */
+const OTE_DETAIL_PRESERVE_KEYS = /** @type {const} */ (['vmBuildLogRows', 'tcConfigText', 'ycLabelSections', 'tcOperationPending'])
+
+function hasVmBuildRows(val) {
+  return Array.isArray(val) && val.length > 0
+}
+
+/**
+ * Сохранить деталь карточки, если в `incoming` нет полноценной замены (ответ индекса после `loadDetail`).
+ * @param {Record<string, unknown> | null | undefined} prev
+ * @param {Record<string, unknown>} incoming
+ */
+function mergeOteClientRow(prev, incoming) {
+  if (!prev) return incoming
+  const out = { ...incoming }
+  for (const k of OTE_DETAIL_PRESERVE_KEYS) {
+    const nextVal = out[k]
+    const prevVal = prev[k]
+    if (k === 'vmBuildLogRows') {
+      if (!hasVmBuildRows(nextVal) && hasVmBuildRows(prevVal)) out[k] = prevVal
+    } else if (k === 'tcConfigText') {
+      const nextStr = typeof nextVal === 'string' ? nextVal.trim() : ''
+      const prevStr = typeof prevVal === 'string' ? prevVal.trim() : ''
+      if (!nextStr && prevStr) out[k] = prevVal
+    } else if (k === 'ycLabelSections') {
+      if (!Array.isArray(nextVal) || !nextVal.length) {
+        if (Array.isArray(prevVal) && prevVal.length) out[k] = prevVal
+      }
+    } else if (k === 'tcOperationPending') {
+      if (!Object.prototype.hasOwnProperty.call(incoming, k) && prevVal != null) out[k] = prevVal
+    }
+  }
+  if (!Object.prototype.hasOwnProperty.call(incoming, 'oteTcCreationSummary') && prev.oteTcCreationSummary != null) {
+    out.oteTcCreationSummary = prev.oteTcCreationSummary
+  }
+  return out
+}
+
 export const useEnvironmentsStore = defineStore('environments', {
   state: () => ({
     /**
@@ -78,7 +116,7 @@ export const useEnvironmentsStore = defineStore('environments', {
       const id = String(item.id || '')
       if (!id) return
       const idx = this.items.findIndex((e) => e.id === id)
-      if (idx >= 0) this.items[idx] = { ...this.items[idx], ...item }
+      if (idx >= 0) this.items[idx] = mergeOteClientRow(this.items[idx], item)
       else this.items.unshift(item)
     },
     /** Вернуть демо-данные (локальная разработка без YC). */
@@ -96,7 +134,11 @@ export const useEnvironmentsStore = defineStore('environments', {
       try {
         const res = await $fetch('/api/ote/instances', { credentials: 'include' })
         if (Array.isArray(res.items)) {
-          this.items = res.items
+          const prevItems = this.items
+          this.items = res.items.map((row) => {
+            const prev = prevItems.find((e) => e.id === row.id)
+            return mergeOteClientRow(prev, row)
+          })
           this.listSource = 'yc'
           this.tcTable = res.tcTable && typeof res.tcTable === 'object' ? res.tcTable : null
         } else {

@@ -81,6 +81,13 @@ export default defineNuxtConfig({
     sqlitePath: envPick('NUXT_SQLITE_PATH', 'data/ote.sqlite'),
     /** Пусто — авто; иначе абсолютный путь к папке с SQL + meta/_journal.json */
     sqliteMigrationsDir: envPick('NUXT_SQLITE_MIGRATIONS_DIR', ''),
+    /**
+     * Мониторинг `/admin/health`: список email админов через запятую/точку с запятой (без учёта регистра).
+     * Пусто — страницу видит любой вошедший пользователь (удобно во внутренней сети).
+     */
+    healthAdminEmails: envPick('NUXT_HEALTH_ADMIN_EMAILS', ''),
+    /** Опционально: SHA коммита для отображения на странице состояния (передайте из CI). */
+    healthBuildSha: envPick('NUXT_BUILD_SHA', ''),
     /** Yandex Cloud: каталог с ВМ (folder id из консоли). */
     ycFolderId: envPick('NUXT_YC_FOLDER_ID'),
     /** Путь к JSON-ключу сервисного аккаунта (от корня репозитория или абсолютный). */
@@ -138,8 +145,6 @@ export default defineNuxtConfig({
     ),
     /** Альтернатива: ключи меток с тем же конфигом (через запятую). */
     ycOteTcConfigLabelKeys: envPick('NUXT_YC_OTE_TC_CONFIG_LABEL_KEYS', ''),
-    /** Один ключ metadata: JSON-массив истории развёртываний (at, versionBackend, versionFrontend, …). */
-    ycOteDeploymentHistoryMetaKey: envPick('NUXT_YC_OTE_DEPLOYMENT_HISTORY_META_KEY', 'deployment-history'),
     /** Квоты для блока «как в TeamCity» (суммы по всем отфильтрованным ВМ). */
     ycQuotaMaxCpu: envPick('NUXT_YC_QUOTA_MAX_CPU', '400'),
     ycQuotaMaxMemoryGb: envPick('NUXT_YC_QUOTA_MAX_MEMORY_GB', '1000'),

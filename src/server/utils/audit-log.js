@@ -131,12 +131,19 @@ function utcDayEndMs(yyyyMmDd) {
 /**
  * Разбор query для списка аудита (общий и по OTE).
  * @param {Record<string, unknown>} q — результат getQuery
- * @param {{ lockedOteResourceId?: string }} ctx — если задано, фильтр по id OTE только такой (игнор query oteResourceId)
+ * @param {{
+ *   lockedOteResourceId?: string,
+ *   lockedOteTag?: string,
+ * }} ctx — при `lockedOteResourceId` фильтр по id карточки; опционально `lockedOteTag` или query `oteTag` — OR по `ote_tag` (события создания с `tc-creation:…`).
  */
 export function parseAuditListQuery(q, ctx = {}) {
   const locked = ctx.lockedOteResourceId != null && String(ctx.lockedOteResourceId).trim()
     ? String(ctx.lockedOteResourceId).trim().slice(0, 512)
     : ''
+
+  const tagFromCtx = ctx.lockedOteTag != null && String(ctx.lockedOteTag).trim() ? String(ctx.lockedOteTag).trim() : ''
+  const tagFromQuery = qs(q, 'oteTag').trim()
+  const lockedOteTag = (tagFromCtx || tagFromQuery).slice(0, 512) || null
 
   const pageSize =
     ctx.fixedPageSize != null
@@ -162,6 +169,7 @@ export function parseAuditListQuery(q, ctx = {}) {
     actionCode,
     search,
     lockedOteResourceId: locked || null,
+    lockedOteTag,
     dateFrom,
     dateTo,
   }
@@ -173,7 +181,11 @@ export function parseAuditListQuery(q, ctx = {}) {
 function buildAuditWhere(p) {
   const conditions = []
 
-  if (p.lockedOteResourceId) {
+  if (p.lockedOteResourceId && p.lockedOteTag) {
+    conditions.push(
+      or(eq(auditEvents.oteResourceId, p.lockedOteResourceId), eq(auditEvents.oteTag, p.lockedOteTag)),
+    )
+  } else if (p.lockedOteResourceId) {
     conditions.push(eq(auditEvents.oteResourceId, p.lockedOteResourceId))
   }
 
@@ -189,7 +201,7 @@ function buildAuditWhere(p) {
       like(auditEvents.actorEmail, pattern),
       like(auditEvents.oteTag, pattern),
     ]
-    if (!p.lockedOteResourceId) {
+    if (!p.lockedOteResourceId || p.lockedOteTag) {
       parts.push(like(auditEvents.oteResourceId, pattern))
     }
     conditions.push(or(...parts))

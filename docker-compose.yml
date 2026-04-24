@@ -1,0 +1,30 @@
+# OTE Manager — локальный или серверный запуск в Docker.
+#
+# 1) cp .env.docker.example .env.docker
+# 2) Заполните OAuth и SESSION_SECRET; при необходимости YC / TeamCity (см. .env.example).
+# 3) docker compose up -d --build
+#
+# Сайт: http://localhost:3000 (или порт из PORT ниже).
+
+services:
+  ote-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ote-manager:latest
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env.docker
+    environment:
+      # Путь внутри контейнера; том `sqlite_data` монтируется в /app/data
+      NUXT_SQLITE_PATH: /app/data/ote.sqlite
+      HOST: 0.0.0.0
+      PORT: 3000
+    volumes:
+      - sqlite_data:/app/data
+      # Пример ключа YC как файл (раскомментируйте и поправьте путь на хосте):
+      # - ./secrets/yc-sa.json:/app/secrets/yc-sa.json:ro
+
+volumes:
+  sqlite_data:

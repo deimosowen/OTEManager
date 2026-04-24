@@ -1,5 +1,12 @@
 <template>
   <div>
+    <OteDeleteConfirmModal
+      v-model="seedDeleteModalOpen"
+      :ote-label="seedDeleteLabel"
+      variant="seed"
+      @confirm="onSeedDeleteConfirm"
+    />
+
     <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-[22px] font-extrabold text-slate-900">Окружения OTE</h1>
       <NuxtLink
@@ -185,11 +192,29 @@ function onToggle(id) {
   toast.show(running ? `OTE «${row.name}» остановлена` : `OTE «${row.name}» запущена`, running ? 'warn' : 'success')
 }
 
+const seedDeleteModalOpen = ref(false)
+const seedDeleteId = ref('')
+const seedDeleteLabel = ref('')
+
 function onDelete(id) {
   const row = store.byId(id)
   if (!row) return
-  if (!confirm(`Удалить OTE «${row.name}»?`)) return
+  seedDeleteId.value = id
+  seedDeleteLabel.value = row.name || ''
+  seedDeleteModalOpen.value = true
+}
+
+function onSeedDeleteConfirm() {
+  const id = seedDeleteId.value
+  const name = seedDeleteLabel.value
+  if (!id) {
+    seedDeleteModalOpen.value = false
+    return
+  }
   store.remove(id)
-  toast.show(`OTE «${row.name}» удалена`, 'error')
+  toast.show(name ? `OTE «${name}» удалена` : 'Окружение удалено', 'error')
+  seedDeleteModalOpen.value = false
+  seedDeleteId.value = ''
+  seedDeleteLabel.value = ''
 }
 </script>

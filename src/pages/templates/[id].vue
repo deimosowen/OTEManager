@@ -20,7 +20,39 @@
 
     <div v-else class="max-w-[960px] space-y-6">
       <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-card">
-        <AppInput v-model="form.name" label="Название" placeholder="Автотесты, Windows single" autocomplete="off" />
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-5">
+          <div class="min-w-0 flex-1">
+            <AppInput v-model="form.name" label="Название" placeholder="Автотесты, Windows single" autocomplete="off" />
+          </div>
+          <div class="w-full shrink-0 sm:w-52">
+            <AppSelect v-model="form.targetOs" class="w-full" label="Тип (ОС)" :options="osOptions" />
+          </div>
+        </div>
+        <p class="mt-2 max-w-xl text-xs font-semibold text-slate-500">
+          «Все» — шаблон виден при любой сборке. «Windows» / «Linux» — только при соответствующем пресете на странице создания OTE.
+        </p>
+        <label
+          class="mt-5 flex cursor-pointer items-start gap-3.5 rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50/90 to-violet-50/20 p-4 transition hover:border-violet-200/60 hover:shadow-sm"
+        >
+          <input
+            v-model="form.isPersonal"
+            type="checkbox"
+            class="mt-0.5 size-4 shrink-0 rounded border-slate-300 text-brand focus:ring-2 focus:ring-brand/30"
+          />
+          <span class="min-w-0">
+            <span class="flex flex-wrap items-center gap-2">
+              <span class="text-sm font-extrabold text-slate-900">Личный шаблон</span>
+              <span
+                class="rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-violet-900"
+              >
+                только вы
+              </span>
+            </span>
+            <span class="mt-1.5 block text-xs font-semibold leading-relaxed text-slate-600">
+              Такой шаблон не попадает в журнал аудита и в списке каталога виден только вам. При создании OTE YAML по-прежнему уходит в TeamCity.
+            </span>
+          </span>
+        </label>
         <div class="mt-5">
           <label class="mb-1.5 block text-sm font-bold text-slate-800">Описание (необязательно)</label>
           <textarea
@@ -32,10 +64,10 @@
         </div>
         <div class="mt-5">
           <label class="mb-1.5 block text-sm font-bold text-slate-800">YAML</label>
-          <textarea
+          <AppTextareaWithLineNumbers
             v-model="form.yaml"
-            spellcheck="false"
-            class="min-h-[420px] w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 font-mono text-xs leading-relaxed text-slate-900 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15"
+            :spellcheck="false"
+            min-height-class="min-h-[420px]"
             placeholder="metadata:&#10;  tag: &quot;%metadata.tag%&quot;&#10;..."
           />
           <p class="mt-1.5 text-xs font-semibold text-slate-500">При сохранении выполняется проверка синтаксиса YAML.</p>
@@ -54,6 +86,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { DEPLOYMENT_TEMPLATE_OS_OPTIONS } from '~/constants/deployment-template-os.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -66,10 +99,14 @@ const loading = ref(true)
 const loadError = ref('')
 const saving = ref(false)
 
+const osOptions = DEPLOYMENT_TEMPLATE_OS_OPTIONS
+
 const form = reactive({
   name: '',
+  targetOs: 'all',
   description: '',
   yaml: '',
+  isPersonal: false,
 })
 
 const meta = reactive({
@@ -88,8 +125,11 @@ function formatUtc(iso) {
 
 function applyTemplate(t) {
   form.name = t.name || ''
+  const os = String(t.targetOs || '').toLowerCase()
+  form.targetOs = os === 'windows' || os === 'linux' ? os : 'all'
   form.description = t.description || ''
   form.yaml = t.yaml || ''
+  form.isPersonal = Boolean(t.isPersonal)
   meta.createdAt = t.createdAt || ''
   meta.updatedAt = t.updatedAt || ''
   meta.createdByLogin = t.createdByLogin || ''
@@ -99,9 +139,11 @@ function applyTemplate(t) {
 async function loadOne() {
   if (isNew.value) {
     form.name = ''
+    form.targetOs = 'all'
     form.description = ''
     form.yaml =
       'metadata:\n  tag: "%metadata.tag%"\n  days_life: 1\n\ncaseone:\n  version: "%caseone.version%"\n'
+    form.isPersonal = false
     meta.createdAt = ''
     meta.updatedAt = ''
     meta.createdByLogin = ''
@@ -147,8 +189,10 @@ async function save() {
         credentials: 'include',
         body: {
           name: form.name,
+          targetOs: form.targetOs,
           description: form.description,
           yaml: form.yaml,
+          isPersonal: form.isPersonal,
         },
       })
       const id = res?.template?.id
@@ -165,8 +209,10 @@ async function save() {
       credentials: 'include',
       body: {
         name: form.name,
+        targetOs: form.targetOs,
         description: form.description,
         yaml: form.yaml,
+        isPersonal: form.isPersonal,
       },
     })
     if (res?.template) applyTemplate(res.template)

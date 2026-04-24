@@ -1,0 +1,25 @@
+# Git и IDE
+.git
+.github
+.cursor
+*.md
+!README.md
+
+# Зависимости и артефакты сборки (ставятся в образе)
+node_modules
+.nuxt
+.output
+dist
+coverage
+
+# Локальные секреты и данные
+.env
+.env.*
+!.env.example
+!.env.docker.example
+data
+*.sqlite
+
+# Тесты и прочее
+tests
+vitest.config.mjs

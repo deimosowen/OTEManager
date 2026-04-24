@@ -5,6 +5,8 @@ import { parseAuditListQuery, queryAuditEvents } from '../../../../utils/audit-l
  * События аудита по одной OTE (идентификатор строки в UI: grp:…, id ВМ, seed-…).
  *
  * Пагинация: `page`. Фильтры: `actionCode`, `search` (логин / почта / метка — OR), `dateFrom`, `dateTo`.
+ * Query `oteTag` — значение metadata.tag (как в карточке `oteName`): в выборку попадают строки с этим `ote_tag`
+ * или с `ote_resource_id` равным id карточки (создание OTE, старт/стоп и т.д. с привязкой к тэгу).
  */
 export default defineEventHandler(async (event) => {
   requireOteUser(event)
@@ -17,6 +19,7 @@ export default defineEventHandler(async (event) => {
   const { items, total, page, pageSize } = await queryAuditEvents(parsed)
   return {
     oteResourceId: id,
+    oteTag: parsed.lockedOteTag || null,
     items,
     total,
     page,

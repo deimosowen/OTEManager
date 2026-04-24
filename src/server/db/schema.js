@@ -73,6 +73,28 @@ export const oteTcCreations = sqliteTable(
 )
 
 /**
+ * Пользовательские преднастройки формы создания OTE («мои конфигурации»).
+ * Базовый пресет — из констант `OTE_CREATION_PRESETS`; значения полей — JSON.
+ */
+export const oteCreateSavedConfigs = sqliteTable(
+  'ote_create_saved_configs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    actorLogin: text('actor_login', { length: 256 }).notNull(),
+    actorEmail: text('actor_email', { length: 512 }).notNull(),
+    name: text('name', { length: 256 }).notNull(),
+    basePresetId: text('base_preset_id', { length: 64 }).notNull(),
+    deploymentTemplateId: integer('deployment_template_id'),
+    propertiesJson: text('properties_json').notNull(),
+  },
+  (t) => ({
+    actorUpdatedIdx: index('ote_create_saved_configs_actor_updated_idx').on(t.actorLogin, t.updatedAt),
+  }),
+)
+
+/**
  * YAML-шаблоны деплоя OTE (для параметра default_deploymet_config_template и редактора).
  */
 export const oteDeploymentTemplates = sqliteTable(
@@ -80,8 +102,12 @@ export const oteDeploymentTemplates = sqliteTable(
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     name: text('name', { length: 256 }).notNull(),
+    /** `all` | `windows` | `linux` — для фильтра при создании OTE по типу сборки. */
+    targetOs: text('target_os', { length: 16 }).notNull().default('all'),
     description: text('description'),
     yamlBody: text('yaml_body').notNull(),
+    /** 1 — только автор (`created_by_login`) видит шаблон в каталоге; события аудита не пишутся. */
+    isPersonal: integer('is_personal').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
     createdByLogin: text('created_by_login', { length: 256 }).notNull(),

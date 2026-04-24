@@ -1,0 +1,26 @@
+# Запуск уже собранного образа (без build и без клона репозитория на сервере).
+#
+# На машине с исходниками: соберите и запушьте образ (см. README, npm run docker:publish).
+# На сервере: положите рядом `.env.docker` и выполните:
+#   OTE_MANAGER_IMAGE=ghcr.io/you/ote-manager:0.1.5 docker compose -f docker-compose.image.yml up -d
+#
+# Либо создайте `.env` рядом с compose только с строкой OTE_MANAGER_IMAGE=...
+
+services:
+  ote-manager:
+    image: ${OTE_MANAGER_IMAGE:?set OTE_MANAGER_IMAGE e.g. ghcr.io/you/ote-manager:0.1.5}
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env.docker
+    environment:
+      NUXT_SQLITE_PATH: /app/data/ote.sqlite
+      HOST: 0.0.0.0
+      PORT: 3000
+    volumes:
+      - sqlite_data:/app/data
+      # Ключ YC: каталог на хосте рядом с compose (например ./keys/yc-sa.json), не именованный том.
+      # - ./keys:/app/keys:ro
+
+volumes:
+  sqlite_data:

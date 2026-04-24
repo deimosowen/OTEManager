@@ -1,32 +1,30 @@
 import { teamCityAuthorizationHeader, teamCityRestBaseUrl } from './config.js'
 
 /**
- * @param {string} s
- */
-function escapeXml(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
-}
-
-/**
+ * Тело POST /app/rest/buildQueue в формате TeamCity REST (JSON).
+ * Важно: многострочные значения (YAML в `default_deploymet_config_template`) нельзя передавать
+ * в XML-атрибуте `value="..."` — по правилам XML 1.0 переводы строк в атрибутах нормализуются в пробелы,
+ * и YAML превращается в одну строку. В JSON строки переносы кодируются как `\n` и доходят до TC целиком.
+ *
  * @param {string} buildTypeId
  * @param {Record<string, string>} properties
  */
-function buildQueueRequestXml(buildTypeId, properties) {
-  const lines = Object.entries(properties).map(
-    ([name, value]) => `    <property name="${escapeXml(name)}" value="${escapeXml(value)}"/>`,
-  )
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<build>
-  <buildType id="${escapeXml(buildTypeId)}"/>
-  <properties>
-${lines.join('\n')}
-  </properties>
-</build>`
+function buildQueueRequestJson(buildTypeId, properties) {
+  const id = String(buildTypeId || '').trim()
+  const entries = Object.entries(properties || {}).filter(([name]) => String(name || '').trim())
+  /** @type {Record<string, unknown>} */
+  const payload = {
+    buildType: { id },
+  }
+  if (entries.length) {
+    payload.properties = {
+      property: entries.map(([name, value]) => ({
+        name: String(name),
+        value: value == null ? '' : String(value),
+      })),
+    }
+  }
+  return JSON.stringify(payload)
 }
 
 /**
@@ -50,15 +48,15 @@ export async function queueTeamCityBuild(opts) {
     throw new Error('TeamCity: не указан buildTypeId')
   }
   const url = `${baseUrl}/app/rest/buildQueue`
-  const xml = buildQueueRequestXml(buildTypeId.trim(), properties)
+  const body = buildQueueRequestJson(buildTypeId.trim(), properties)
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: authorization,
-      'Content-Type': 'application/xml',
+      'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: xml,
+    body,
   })
   const text = await res.text()
   if (!res.ok) {

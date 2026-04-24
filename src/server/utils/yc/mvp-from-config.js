@@ -34,10 +34,6 @@ export function buildMvpOptsFromRuntimeConfig(config) {
   const tcConfigLabelKeys = parseCommaSeparatedKeys(
     runtimeConfigString(config.ycOteTcConfigLabelKeys, 'NUXT_YC_OTE_TC_CONFIG_LABEL_KEYS'),
   )
-  const deploymentHistoryMetaKey = runtimeConfigString(
-    config.ycOteDeploymentHistoryMetaKey,
-    'NUXT_YC_OTE_DEPLOYMENT_HISTORY_META_KEY',
-  )
 
   const tplHostMatch = String(appPublicUrlTemplate || '').match(/https?:\/\/\{[^}]+\}\.([^/\s"'<>]+)/i)
   const tplDerivedHost = tplHostMatch ? tplHostMatch[1].trim() : ''
@@ -64,7 +60,6 @@ export function buildMvpOptsFromRuntimeConfig(config) {
     appPublicUrlTemplate,
     tcConfigMetaKeys,
     tcConfigLabelKeys,
-    deploymentHistoryMetaKey,
     usernameLabelKeysForTc: parsedUser.length ? parsedUser : ['username', 'ldap-user', 'owner', 'login'],
     appLinksHost,
     rabbitManagementPort,

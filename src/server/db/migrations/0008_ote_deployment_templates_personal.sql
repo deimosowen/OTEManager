@@ -1,0 +1,1 @@
+ALTER TABLE `ote_deployment_templates` ADD COLUMN `is_personal` integer NOT NULL DEFAULT 0;
