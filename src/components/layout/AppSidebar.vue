@@ -21,6 +21,7 @@ import {
   Activity,
   CirclePlus,
   FileStack,
+  Home,
   Info,
   LayoutGrid,
   ScrollText,
@@ -30,7 +31,8 @@ import {
 const route = useRoute()
 
 const items = [
-  { to: '/', label: 'Окружения OTE', icon: LayoutGrid, match: 'mvp' },
+  { to: '/', label: 'Главная', icon: Home, match: 'home' },
+  { to: '/environments', label: 'Окружения OTE', icon: LayoutGrid, match: 'environments' },
   { to: '/create', label: 'Создать OTE', icon: CirclePlus, match: 'create' },
   { to: '/templates', label: 'Шаблоны', icon: FileStack, match: 'templates' },
   { to: '/audit', label: 'Аудит', icon: ScrollText, match: 'audit' },
@@ -41,13 +43,14 @@ const items = [
 
 function isActive(item) {
   if (item.match === 'exact') return route.path === item.to
+  if (item.match === 'home') return route.path === '/'
   if (item.match === 'create') return route.path.startsWith('/create')
   if (item.match === 'about') return route.path.startsWith('/about')
   if (item.match === 'templates') return route.path.startsWith('/templates')
   if (item.match === 'audit') return route.path.startsWith('/audit')
   if (item.match === 'admin') return route.path.startsWith('/admin')
-  if (item.match === 'mvp') {
-    return route.path === '/' || route.path.startsWith('/environments/')
+  if (item.match === 'environments') {
+    return route.path === '/environments' || route.path.startsWith('/environments/')
   }
   return false
 }

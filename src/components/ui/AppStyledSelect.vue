@@ -23,7 +23,7 @@
         class="flex w-full items-center gap-2 rounded-xl border border-slate-200/95 bg-white px-3.5 py-2.5 pr-10 text-left text-sm text-slate-800 shadow-sm ring-1 ring-slate-900/[0.04] transition hover:border-slate-300 hover:shadow-md focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none"
         :aria-expanded="open ? 'true' : 'false'"
         aria-haspopup="listbox"
-        :aria-labelledby="label ? labelId : undefined"
+        :aria-labelledby="ariaLabelledBy"
         :aria-controls="open ? listboxId : undefined"
         @click="toggle"
         @keydown.down.prevent="openFromKeyboard"
@@ -52,7 +52,7 @@
             :id="listboxId"
             ref="panelRef"
             role="listbox"
-            :aria-labelledby="label ? labelId : undefined"
+            :aria-labelledby="ariaLabelledBy"
             class="fixed z-[280] overflow-auto rounded-xl border border-slate-200/95 bg-white py-1 shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/[0.04]"
             :style="panelStyle"
           >
@@ -98,6 +98,8 @@ const props = defineProps({
   placeholder: { type: String, default: 'Выберите значение' },
   /** Текст при пустом списке опций. */
   noOptionsMessage: { type: String, default: 'Нет вариантов' },
+  /** id внешнего заголовка для aria-labelledby, если label не задан. */
+  labelledBy: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -124,6 +126,11 @@ function valueKey(v) {
 const selectedOption = computed(
   () => props.options.find((o) => valueKey(o.value) === valueKey(props.modelValue)) ?? null,
 )
+
+const ariaLabelledBy = computed(() => {
+  if (props.label) return labelId
+  return props.labelledBy || undefined
+})
 
 function isSelected(opt) {
   return valueKey(opt.value) === valueKey(props.modelValue)

@@ -22,6 +22,8 @@ function canAccessCreationRow(user, row) {
  * Состояние запроса на создание OTE + синхронизация с TeamCity.
  */
 export default defineEventHandler(async (event) => {
+  setResponseHeader(event, 'Cache-Control', 'no-store, no-cache, must-revalidate')
+
   const user = requireOteUser(event)
   const id = parseId(event.context.params?.id)
   if (!id) {

@@ -61,16 +61,15 @@
 
     <div v-else class="space-y-6">
       <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-card ring-1 ring-slate-900/5">
-        <!-- Классический выбор: select -->
-        <div v-if="viewMode === 'classic'" class="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-          <AppStyledSelect
-            v-model="selectedTemplateId"
-            label="Шаблон сборки"
-            class="w-full min-w-0"
-            :options="templateOptions"
-            placeholder="Выберите шаблон"
-          />
-          <div class="flex flex-col justify-end pb-px sm:pb-0.5">
+        <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <h2 id="create-template-heading" class="text-sm font-extrabold text-slate-900">Шаблон сборки</h2>
+          <div class="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+            <NuxtLink
+              to="/templates"
+              class="text-xs font-bold text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand"
+            >
+              Управление шаблонами
+            </NuxtLink>
             <a
               v-if="currentTemplate?.teamcityBuildConfigUrl"
               :href="currentTemplate.teamcityBuildConfigUrl"
@@ -81,24 +80,23 @@
               <ExternalLink class="size-3.5 shrink-0" aria-hidden="true" />
               Сборка в TeamCity
             </a>
-            <p v-else class="text-xs font-semibold text-slate-500">—</p>
+            <span v-else class="text-xs font-semibold text-slate-500">—</span>
           </div>
+        </div>
+
+        <!-- Классический выбор: select -->
+        <div v-if="viewMode === 'classic'">
+          <AppStyledSelect
+            v-model="selectedTemplateId"
+            labelled-by="create-template-heading"
+            class="w-full min-w-0"
+            :options="templateOptions"
+            placeholder="Выберите шаблон"
+          />
         </div>
 
         <!-- Плитки: тот же selectedTemplateId, общая форма ниже -->
         <div v-else>
-          <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 class="text-sm font-extrabold text-slate-900">Шаблон сборки</h2>
-            </div>
-            <NuxtLink
-              to="/templates"
-              class="text-xs font-bold text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand"
-            >
-              Управление шаблонами
-            </NuxtLink>
-          </div>
-
           <div v-if="!templateCards.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div
               v-for="mock in tilePlaceholderMocks"
@@ -134,74 +132,79 @@
               </p>
             </button>
           </div>
-
-          <div
-            v-if="currentTemplate?.teamcityBuildConfigUrl"
-            class="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 pt-5"
-          >
-            <a
-              :href="currentTemplate.teamcityBuildConfigUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold text-brand transition hover:bg-brand/5 hover:underline"
-            >
-              <ExternalLink class="size-3.5 shrink-0" aria-hidden="true" />
-              Сборка в TeamCity
-            </a>
-          </div>
         </div>
 
-        <div class="mt-6">
-          <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
-            <h2 class="text-sm font-extrabold text-slate-900">Параметры (overrides)</h2>
+        <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200/90 bg-white ring-1 ring-slate-900/[0.04]">
+          <button
+            type="button"
+            class="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50/90"
+            :aria-expanded="overridesPanelOpen"
+            aria-controls="create-overrides-panel"
+            @click="overridesPanelOpen = !overridesPanelOpen"
+          >
+            <span class="flex min-w-0 items-center gap-2.5">
+              <ChevronDown
+                class="size-5 shrink-0 text-slate-500 transition-transform duration-200"
+                :class="overridesPanelOpen ? '' : '-rotate-90'"
+                aria-hidden="true"
+              />
+              <span class="text-sm font-extrabold text-slate-900">Параметры (overrides)</span>
+            </span>
             <NuxtLink
               v-if="currentTemplate"
               :to="`/templates/${currentTemplate.id}`"
-              class="text-xs font-bold text-brand hover:underline"
+              class="shrink-0 text-xs font-bold text-brand hover:underline"
+              @click.stop
             >
               Открыть шаблон
             </NuxtLink>
-          </div>
+          </button>
 
-          <div class="overflow-hidden rounded-xl border border-slate-200">
-            <div class="overflow-x-auto">
-              <table class="min-w-[760px] w-full border-collapse text-sm">
-                <thead>
-                  <tr class="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                    <th class="px-3 py-2.5">Key</th>
-                    <th class="px-3 py-2.5">Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-if="!overrideRows.length">
-                    <td colspan="2" class="px-3 py-8 text-center text-xs font-semibold text-slate-500">Нет параметров в шаблоне</td>
-                  </tr>
-                  <tr v-for="r in overrideRows" :key="r.key" class="border-b border-slate-100 last:border-b-0">
-                    <td class="px-3 py-2.5 align-top font-mono text-xs text-slate-800">{{ r.key }}</td>
-                    <td class="px-3 py-2.5 align-top">
-                      <input
-                        v-model="overrides[r.key]"
-                        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono text-slate-800 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15"
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+          <div
+            v-show="overridesPanelOpen"
+            id="create-overrides-panel"
+            class="border-t border-slate-100 px-4 pb-4 pt-1"
+          >
+            <div class="overflow-hidden rounded-xl border border-slate-200">
+              <div class="overflow-x-auto">
+                <table class="min-w-[760px] w-full border-collapse text-sm">
+                  <thead>
+                    <tr class="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                      <th class="px-3 py-2.5">Key</th>
+                      <th class="px-3 py-2.5">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-if="!overrideRows.length">
+                      <td colspan="2" class="px-3 py-8 text-center text-xs font-semibold text-slate-500">Нет параметров в шаблоне</td>
+                    </tr>
+                    <tr v-for="r in overrideRows" :key="r.key" class="border-b border-slate-100 last:border-b-0">
+                      <td class="px-3 py-2.5 align-top font-mono text-xs text-slate-800">{{ r.key }}</td>
+                      <td class="px-3 py-2.5 align-top">
+                        <input
+                          v-model="overrides[r.key]"
+                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono text-slate-800 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15"
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
+
+            <p v-if="yamlPreviewError" class="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
+              {{ yamlPreviewError }}
+            </p>
+
+            <details v-if="currentTemplate" class="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+              <summary class="cursor-pointer text-sm font-extrabold text-slate-800 [&::-webkit-details-marker]:hidden">
+                YAML предпросмотр
+              </summary>
+              <div class="mt-3">
+                <AppTextareaWithLineNumbers :model-value="yamlPreview" :spellcheck="false" min-height-class="min-h-[320px]" />
+              </div>
+            </details>
           </div>
-
-          <p v-if="yamlPreviewError" class="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
-            {{ yamlPreviewError }}
-          </p>
-
-          <details v-if="currentTemplate" class="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-            <summary class="cursor-pointer text-sm font-extrabold text-slate-800 [&::-webkit-details-marker]:hidden">
-              YAML предпросмотр
-            </summary>
-            <div class="mt-3">
-              <AppTextareaWithLineNumbers :model-value="yamlPreview" :spellcheck="false" min-height-class="min-h-[320px]" />
-            </div>
-          </details>
         </div>
 
         <div class="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
@@ -222,7 +225,16 @@
           class="mt-6 scroll-mt-28 border-t border-slate-200 pt-5"
           tabindex="-1"
         >
-          <h2 class="text-base font-extrabold text-slate-900">Запрос #{{ creation.id }}</h2>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <h2 class="text-base font-extrabold text-slate-900">Запрос #{{ creation.id }}</h2>
+            <NuxtLink
+              :to="`/create/requests/${creation.id}`"
+              class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand/25 bg-brand-light/50 px-3 py-1.5 text-xs font-extrabold text-brand transition hover:border-brand/40 hover:bg-brand-light"
+            >
+              <Terminal class="size-3.5 shrink-0" aria-hidden="true" />
+              Отслеживание и лог
+            </NuxtLink>
+          </div>
           <p class="mt-1 text-sm font-semibold text-slate-600">
             Статус:
             <span :class="oteTcCreationStatusClass(creation.status)">{{ oteTcCreationStatusLabel(creation.status) }}</span>
@@ -275,15 +287,18 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ExternalLink, LayoutGrid, LayoutList } from 'lucide-vue-next'
+import { ChevronDown, ExternalLink, LayoutGrid, LayoutList, Terminal } from 'lucide-vue-next'
 import { oteTcCreationStatusClass, oteTcCreationStatusLabel } from '~/utils/ote-tc-creation-status.js'
 
 const toast = useToast()
 
 /** Локальный выбор вида страницы: классический select или макет плиток */
 const CREATE_VIEW_STORAGE_KEY = 'ote-manager:create-page-view'
+/** Свернут/развернут блок параметров overrides */
+const CREATE_OVERRIDES_PANEL_KEY = 'ote-manager:create-overrides-expanded'
 
 const viewMode = ref(/** @type {'classic' | 'tiles'} */ ('classic'))
+const overridesPanelOpen = ref(true)
 
 const tilePlaceholderMocks = [
   { title: 'Пример: Windows full stack', blurb: 'Карточка-заглушка, пока список шаблонов пуст.' },
@@ -298,6 +313,15 @@ watch(viewMode, (mode) => {
     } catch {
       /* ignore */
     }
+  }
+})
+
+watch(overridesPanelOpen, (open) => {
+  if (!import.meta.client) return
+  try {
+    localStorage.setItem(CREATE_OVERRIDES_PANEL_KEY, open ? '1' : '0')
+  } catch {
+    /* ignore */
   }
 })
 
@@ -514,6 +538,9 @@ onMounted(() => {
     try {
       const stored = localStorage.getItem(CREATE_VIEW_STORAGE_KEY)
       if (stored === 'tiles' || stored === 'classic') viewMode.value = stored
+      const panel = localStorage.getItem(CREATE_OVERRIDES_PANEL_KEY)
+      if (panel === '0' || panel === 'false') overridesPanelOpen.value = false
+      if (panel === '1' || panel === 'true') overridesPanelOpen.value = true
     } catch {
       /* ignore */
     }

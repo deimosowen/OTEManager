@@ -130,12 +130,14 @@ function labelFor(code) {
   return auditActionLabel(code)
 }
 
-/** Ссылка из колонки «Ресурс»: шаблоны сборок → /templates/:id, иначе карточка OTE */
+/** Ссылка из колонки «Ресурс»: шаблоны, запрос создания OTE в TC, иначе карточка OTE */
 function resourceHref(oteResourceId) {
   if (!oteResourceId) return '/'
   const s = String(oteResourceId)
-  const m = /^build-template:(\d+)$/.exec(s)
-  if (m) return `/templates/${m[1]}`
+  const bt = /^build-template:(\d+)$/.exec(s)
+  if (bt) return `/templates/${bt[1]}`
+  const tc = /^tc-creation:(\d+)$/.exec(s)
+  if (tc) return `/create/requests/${tc[1]}`
   return `/environments/${encodeURIComponent(s)}`
 }
 

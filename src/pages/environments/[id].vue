@@ -583,7 +583,7 @@
   <div v-else class="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-card">
     <div class="text-sm font-semibold text-slate-600">Окружение не найдено</div>
     <div class="mt-4">
-      <NuxtLink to="/" class="font-bold text-brand hover:underline">Вернуться к списку</NuxtLink>
+      <NuxtLink to="/environments" class="font-bold text-brand hover:underline">Вернуться к списку</NuxtLink>
     </div>
   </div>
 </template>
