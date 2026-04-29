@@ -60,6 +60,54 @@
     </div>
 
     <div v-else class="space-y-6">
+      <section
+        v-if="shortcutFavoriteTemplates.length || shortcutRecentTemplates.length"
+        class="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-amber-50/40 via-white to-sky-50/30 p-5 shadow-card ring-1 ring-slate-900/5"
+        aria-label="Быстрый выбор шаблона"
+      >
+        <div v-if="shortcutFavoriteTemplates.length" class="mb-4 last:mb-0">
+          <h3 class="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Избранное</h3>
+          <div class="mt-2.5 flex flex-wrap gap-2">
+            <div
+              v-for="t in shortcutFavoriteTemplates"
+              :key="`fav-${t.id}`"
+              class="inline-flex max-w-full items-center gap-1 rounded-xl border border-amber-200/80 bg-white/90 pl-3 pr-1.5 py-1.5 shadow-sm ring-1 ring-amber-900/5"
+            >
+              <button
+                type="button"
+                class="min-w-0 truncate text-left text-[13px] font-extrabold text-slate-900 transition hover:text-brand"
+                @click="selectTemplateAndTrack(t.id)"
+              >
+                {{ t.name }}
+              </button>
+              <button
+                type="button"
+                class="inline-flex shrink-0 rounded-lg p-1 text-amber-500 transition hover:bg-amber-100/80"
+                :aria-label="`Убрать «${t.name}» из избранного`"
+                @click="void toggleFavorite(t.id)"
+              >
+                <Star class="size-4 fill-amber-400" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div v-if="shortcutRecentTemplates.length">
+          <h3 class="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Недавние</h3>
+          <div class="mt-2.5 flex flex-wrap gap-2">
+            <button
+              v-for="t in shortcutRecentTemplates"
+              :key="`rec-${t.id}`"
+              type="button"
+              class="inline-flex max-w-full min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-left text-[13px] font-bold text-slate-800 shadow-sm transition hover:border-brand/35 hover:bg-brand-light/30 hover:text-brand"
+              @click="selectTemplateAndTrack(t.id)"
+            >
+              <Clock class="size-3.5 shrink-0 text-slate-400" aria-hidden="true" />
+              <span class="truncate">{{ t.name }}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
       <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-card ring-1 ring-slate-900/5">
         <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
           <h2 id="create-template-heading" class="text-sm font-extrabold text-slate-900">Шаблон сборки</h2>
@@ -93,6 +141,16 @@
             :options="templateOptions"
             placeholder="Выберите шаблон"
           />
+          <div v-if="currentTemplate" class="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-bold text-slate-600 transition hover:bg-slate-100 hover:text-slate-900"
+              @click="void toggleFavorite(currentTemplate.id)"
+            >
+              <Star class="size-3.5" :class="isFavorite(currentTemplate.id) ? 'fill-amber-400 text-amber-500' : 'text-slate-400'" aria-hidden="true" />
+              {{ isFavorite(currentTemplate.id) ? 'В избранном' : 'В избранное' }}
+            </button>
+          </div>
         </div>
 
         <!-- Плитки: тот же selectedTemplateId, общая форма ниже -->
@@ -111,26 +169,38 @@
           </div>
 
           <div v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            <button
+            <div
               v-for="card in templateCards"
               :key="card.id"
-              type="button"
-              class="flex flex-col rounded-lg border px-3 py-2.5 text-left shadow-card transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+              role="button"
+              tabindex="0"
+              class="relative flex flex-col rounded-lg border px-3 py-2.5 text-left shadow-card outline-none transition focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
               :class="
                 isTemplateCardSelected(card.id)
                   ? 'border-brand bg-brand-light/60 ring-2 ring-brand/25'
-                  : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-card-md'
+                  : 'cursor-pointer border-slate-200 bg-white hover:border-slate-300 hover:shadow-card-md'
               "
-              @click="selectedTemplateId = String(card.id)"
+              @click="selectTemplateAndTrack(card.id)"
+              @keydown.enter.prevent="selectTemplateAndTrack(card.id)"
+              @keydown.space.prevent="selectTemplateAndTrack(card.id)"
             >
-              <div class="flex items-start justify-between gap-1.5">
+              <button
+                type="button"
+                class="absolute right-2 top-2 z-10 inline-flex rounded-md p-1 transition hover:bg-white/90"
+                :class="isFavorite(card.id) ? 'text-amber-500' : 'text-slate-300 hover:text-amber-500'"
+                :aria-label="isFavorite(card.id) ? 'Убрать из избранного' : 'В избранное'"
+                @click.stop="void toggleFavorite(card.id)"
+              >
+                <Star class="size-4" :class="isFavorite(card.id) ? 'fill-amber-400' : ''" aria-hidden="true" />
+              </button>
+              <div class="flex items-start justify-between gap-1.5 pr-7">
                 <span class="line-clamp-2 min-w-0 flex-1 text-[13px] font-extrabold leading-snug text-slate-900">{{ card.name }}</span>
                 <PersonalTemplateBadge v-if="card.isPersonal" compact class="shrink-0" />
               </div>
               <p class="mt-1.5 line-clamp-2 text-[11px] font-medium leading-snug text-slate-600">
                 {{ card.description || 'Без описания' }}
               </p>
-            </button>
+            </div>
           </div>
         </div>
 
@@ -287,10 +357,14 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ChevronDown, ExternalLink, LayoutGrid, LayoutList, Terminal } from 'lucide-vue-next'
+import { ChevronDown, Clock, ExternalLink, LayoutGrid, LayoutList, Star, Terminal } from 'lucide-vue-next'
 import { oteTcCreationStatusClass, oteTcCreationStatusLabel } from '~/utils/ote-tc-creation-status.js'
+import { useOteTemplateShortcuts } from '~/composables/useOteTemplateShortcuts.js'
 
 const toast = useToast()
+const route = useRoute()
+const { favoriteIds, loadShortcuts, toggleFavorite, isFavorite, recordRecent, orderedRecentIds } =
+  useOteTemplateShortcuts()
 
 /** Локальный выбор вида страницы: классический select или макет плиток */
 const CREATE_VIEW_STORAGE_KEY = 'ote-manager:create-page-view'
@@ -342,6 +416,8 @@ const templateCards = computed(() => {
 })
 
 const selectedTemplateId = ref('')
+/** Пока true — не пишем недавние при программной установке шаблона при загрузке */
+const skipRecentRecord = ref(true)
 const overrides = ref(/** @type {Record<string, string>} */ ({}))
 
 const submitting = ref(false)
@@ -372,9 +448,64 @@ const currentTemplate = computed(() => {
   return templates.value.find((t) => String(t.id) === String(id)) || null
 })
 
+const templateById = computed(() => {
+  const m = new Map()
+  for (const t of templates.value) m.set(String(t.id), t)
+  return m
+})
+
+const shortcutFavoriteTemplates = computed(() => {
+  const map = templateById.value
+  const out = []
+  for (const id of favoriteIds.value) {
+    const t = map.get(String(id))
+    if (t) out.push(t)
+  }
+  return out
+})
+
+const shortcutRecentTemplates = computed(() => {
+  const map = templateById.value
+  const fav = new Set(favoriteIds.value.map(String))
+  const out = []
+  for (const id of orderedRecentIds()) {
+    if (fav.has(String(id))) continue
+    const t = map.get(String(id))
+    if (t) out.push(t)
+  }
+  return out
+})
+
 function isTemplateCardSelected(id) {
   return String(selectedTemplateId.value) === String(id)
 }
+
+function selectTemplateAndTrack(id) {
+  selectedTemplateId.value = String(id)
+}
+
+function applyTemplateFromQuery() {
+  const raw = route.query.template
+  const tid = Array.isArray(raw) ? raw[0] : raw
+  if (tid == null || tid === '') return
+  const s = String(tid).trim()
+  if (!s) return
+  if (templates.value.some((t) => String(t.id) === s)) {
+    selectedTemplateId.value = s
+  }
+}
+
+watch(
+  () => route.query.template,
+  () => {
+    if (!loading.value && templates.value.length) applyTemplateFromQuery()
+  },
+)
+
+watch(selectedTemplateId, (id) => {
+  if (skipRecentRecord.value || !id) return
+  recordRecent(String(id))
+})
 
 const overrideRows = computed(() => {
   const t = currentTemplateFull.value
@@ -445,6 +576,7 @@ const yamlPreview = computed(() => {
 })
 
 async function loadAll() {
+  skipRecentRecord.value = true
   loading.value = true
   loadError.value = ''
   try {
@@ -475,6 +607,9 @@ async function loadAll() {
     templates.value = []
   } finally {
     loading.value = false
+    void nextTick(() => {
+      skipRecentRecord.value = false
+    })
   }
 }
 
@@ -521,6 +656,7 @@ async function submitCreate() {
       return
     }
     creation.value = c
+    await recordRecent(String(t.id), { immediate: true })
     toast.show('Сборка поставлена в TeamCity', 'success')
     void refreshCreation()
     startPoll()
@@ -533,7 +669,7 @@ async function submitCreate() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (import.meta.client) {
     try {
       const stored = localStorage.getItem(CREATE_VIEW_STORAGE_KEY)
@@ -545,7 +681,8 @@ onMounted(() => {
       /* ignore */
     }
   }
-  void loadAll()
+  await Promise.all([loadAll(), loadShortcuts()])
+  applyTemplateFromQuery()
 })
 
 useHead({ title: 'Создание OTE · OTE Manager' })

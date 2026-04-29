@@ -78,6 +78,13 @@
       "when": 1777360000001,
       "tag": "0010_ote_tc_creations_build_template",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1777600000000,
+      "tag": "0011_ote_user_build_template_shortcuts",
+      "breakpoints": true
     }
   ]
 }

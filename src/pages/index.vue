@@ -12,12 +12,14 @@
         class="pointer-events-none absolute -bottom-16 left-0 size-56 rounded-full bg-sky-300/25 blur-2xl"
         aria-hidden="true"
       />
-      <div class="relative max-w-2xl">
+      <div class="relative max-w-4xl">
         <p class="text-xs font-bold uppercase tracking-[0.2em] text-white/85">Добро пожаловать</p>
         <h1 class="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">Рабочий стол OTE</h1>
-        <p class="mt-3 text-sm font-medium leading-relaxed text-white/95 sm:text-[15px]">
-          Ваши окружения и текущие операции в одном месте. Полный список и фильтры — в разделе «Окружения OTE».
-        </p>
+        <div class="mt-3 max-w-full overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]">
+          <p class="w-max whitespace-nowrap text-sm font-medium leading-relaxed text-white/95 sm:text-[15px]">
+            Ваши окружения и текущие операции в одном месте. Полный список и фильтры — в разделе «Окружения OTE».
+          </p>
+        </div>
         <div class="mt-6 flex flex-wrap gap-3">
           <NuxtLink
             to="/environments"

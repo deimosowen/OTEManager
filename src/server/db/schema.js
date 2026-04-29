@@ -115,3 +115,31 @@ export const userIntegrationCredentials = sqliteTable(
     pk: primaryKey({ columns: [t.userLogin, t.provider] }),
   }),
 )
+
+/** Избранные шаблоны сборки для быстрого запуска (по пользователю). */
+export const oteUserBuildTemplateFavorites = sqliteTable(
+  'ote_user_build_template_favorites',
+  {
+    userLogin: text('user_login', { length: 256 }).notNull(),
+    buildTemplateId: integer('build_template_id').notNull(),
+    addedAt: integer('added_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userLogin, t.buildTemplateId] }),
+    userAddedIdx: index('ote_user_btfav_user_added_idx').on(t.userLogin, t.addedAt),
+  }),
+)
+
+/** Недавно использованные шаблоны (одна строка на пару пользователь + шаблон, last_used_at обновляется). */
+export const oteUserBuildTemplateRecent = sqliteTable(
+  'ote_user_build_template_recent',
+  {
+    userLogin: text('user_login', { length: 256 }).notNull(),
+    buildTemplateId: integer('build_template_id').notNull(),
+    lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userLogin, t.buildTemplateId] }),
+    userTimeIdx: index('ote_user_btrec_user_time_idx').on(t.userLogin, t.lastUsedAt),
+  }),
+)
