@@ -14,6 +14,7 @@ import {
   listAllInstancesInFolder,
   mapFullInstanceToEnvRow,
   mapGroupToListRow,
+  resolveListGroupKey,
 } from '../../../utils/yc/compute.js'
 import { resolveTcPendingState } from '../../../utils/ote-tc-pending.js'
 import { buildMvpOptsFromRuntimeConfig } from '../../../utils/yc/mvp-from-config.js'
@@ -47,7 +48,7 @@ export default defineEventHandler(async (event) => {
     const all = await listAllInstancesInFolder(session, folderId)
     const filtered = all.filter((inst) => {
       if (!instanceMatchesLabelFilter(inst, labelKey, labelValue)) return false
-      const gval = (inst.labels && inst.labels[gb]) || inst.id
+      const gval = resolveListGroupKey(inst, labelKey, gb)
       return gval === groupKey
     })
     if (!filtered.length) {

@@ -64,6 +64,20 @@
       "when": 1777500000000,
       "tag": "0008_ote_deployment_templates_personal",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777360000000,
+      "tag": "0009_ote_build_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1777360000001,
+      "tag": "0010_ote_tc_creations_build_template",
+      "breakpoints": true
     }
   ]
 }

@@ -35,6 +35,14 @@ function rowToPublic(row) {
       requestProperties = null
     }
   }
+  let requestParams = null
+  if (row.requestParamsJson) {
+    try {
+      requestParams = JSON.parse(row.requestParamsJson)
+    } catch {
+      requestParams = null
+    }
+  }
   return {
     id: row.id,
     createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
@@ -47,6 +55,10 @@ function rowToPublic(row) {
     teamcityWebUrl: row.teamcityWebUrl,
     status: row.status,
     requestProperties,
+    buildTemplateId: row.buildTemplateId != null ? row.buildTemplateId : null,
+    requestTemplateYaml: row.requestTemplateYaml != null ? String(row.requestTemplateYaml) : null,
+    requestRenderedYaml: row.requestRenderedYaml != null ? String(row.requestRenderedYaml) : null,
+    requestParams,
     metadataTag: row.metadataTag,
     caseoneVersion: row.caseoneVersion,
     deploymentResultJson: row.deploymentResultJson,

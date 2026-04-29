@@ -58,6 +58,10 @@ export const oteTcCreations = sqliteTable(
     teamcityWebUrl: text('teamcity_web_url', { length: 1024 }),
     status: text('status', { length: 32 }).notNull().default('queued'),
     requestPropertiesJson: text('request_properties_json'),
+    buildTemplateId: integer('build_template_id'),
+    requestTemplateYaml: text('request_template_yaml'),
+    requestRenderedYaml: text('request_rendered_yaml'),
+    requestParamsJson: text('request_params_json'),
     metadataTag: text('metadata_tag', { length: 512 }),
     caseoneVersion: text('caseone_version', { length: 512 }),
     deploymentResultJson: text('deployment_result_json'),
@@ -73,40 +77,18 @@ export const oteTcCreations = sqliteTable(
 )
 
 /**
- * Пользовательские преднастройки формы создания OTE («мои конфигурации»).
- * Базовый пресет — из констант `OTE_CREATION_PRESETS`; значения полей — JSON.
+ * Шаблоны сборок создания OTE (TeamCity build + YAML + параметры).
  */
-export const oteCreateSavedConfigs = sqliteTable(
-  'ote_create_saved_configs',
-  {
-    id: integer('id').primaryKey({ autoIncrement: true }),
-    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-    actorLogin: text('actor_login', { length: 256 }).notNull(),
-    actorEmail: text('actor_email', { length: 512 }).notNull(),
-    name: text('name', { length: 256 }).notNull(),
-    basePresetId: text('base_preset_id', { length: 64 }).notNull(),
-    deploymentTemplateId: integer('deployment_template_id'),
-    propertiesJson: text('properties_json').notNull(),
-  },
-  (t) => ({
-    actorUpdatedIdx: index('ote_create_saved_configs_actor_updated_idx').on(t.actorLogin, t.updatedAt),
-  }),
-)
-
-/**
- * YAML-шаблоны деплоя OTE (для параметра default_deploymet_config_template и редактора).
- */
-export const oteDeploymentTemplates = sqliteTable(
-  'ote_deployment_templates',
+export const oteBuildTemplates = sqliteTable(
+  'ote_build_templates',
   {
     id: integer('id').primaryKey({ autoIncrement: true }),
     name: text('name', { length: 256 }).notNull(),
-    /** `all` | `windows` | `linux` — для фильтра при создании OTE по типу сборки. */
-    targetOs: text('target_os', { length: 16 }).notNull().default('all'),
     description: text('description'),
+    teamcityBuildConfigUrl: text('teamcity_build_config_url', { length: 2048 }).notNull(),
+    teamcityBuildTypeId: text('teamcity_build_type_id', { length: 256 }).notNull(),
     yamlBody: text('yaml_body').notNull(),
-    /** 1 — только автор (`created_by_login`) видит шаблон в каталоге; события аудита не пишутся. */
+    paramsJson: text('params_json').notNull(),
     isPersonal: integer('is_personal').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
@@ -116,7 +98,7 @@ export const oteDeploymentTemplates = sqliteTable(
     updatedByEmail: text('updated_by_email', { length: 512 }).notNull(),
   },
   (t) => ({
-    updatedAtIdx: index('ote_deployment_templates_updated_at_idx').on(t.updatedAt),
+    updatedAtIdx: index('ote_build_templates_updated_at_idx').on(t.updatedAt),
   }),
 )
 

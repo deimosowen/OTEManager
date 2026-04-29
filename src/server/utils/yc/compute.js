@@ -358,7 +358,29 @@ function pickRabbitIpFromMembers(members) {
 }
 
 /**
- * Три ссылки CaseOne/Rabbit по правилам Win/Linux (хост из конфига).
+ * Метка или metadata `saas` со значением true / 1 / yes (без учёта регистра).
+ * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance} inst
+ */
+export function instanceHasSaasTrue(inst) {
+  const truthy = (v) => {
+    const s = String(v ?? '').trim().toLowerCase()
+    return s === 'true' || s === '1' || s === 'yes'
+  }
+  const labels = inst.labels || {}
+  const meta = inst.metadata || {}
+  return truthy(labels.saas) || truthy(labels.SaaS) || truthy(meta.saas) || truthy(meta.SaaS)
+}
+
+/**
+ * Хотя бы одна ВМ OTE помечена как SaaS (тег в ЯО).
+ * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[]} members
+ */
+export function membersHaveSaasDeploy(members) {
+  return (members || []).some((m) => instanceHasSaasTrue(m))
+}
+
+/**
+ * Ссылки CaseOne/Rabbit: одна ссылка на приложение — SaaS или одиночный инстанс по тегу saas в ЯО; Rabbit при наличии IP.
  * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[]} members
  * @param {string} labelKey
  * @param {{ appLinksHost?: string, rabbitPort?: number }} [opts]
@@ -375,18 +397,17 @@ export function buildOteAppLinkSet(members, labelKey, opts = {}) {
   const t = String(tag).trim()
   const osKind = inferOteOsKind(members)
   const single = `https://${t}.${host}`
-  const saasWin = `https://app-${t}.${host}`
+  const saasHref = `https://app-${t}.${host}`
   const rabbitIp = pickRabbitIpFromMembers(members)
   const rabbitHref = rabbitIp ? `http://${rabbitIp}:${port}` : ''
+  const saasDeploy = membersHaveSaasDeploy(members)
 
   /** @type {{ key: string, label: string, href: string }[]} */
   const items = []
-  if (osKind === 'windows') {
-    items.push({ key: 'single', label: 'Одиночный инстанс', href: single })
-    items.push({ key: 'saas', label: 'SaaS', href: saasWin })
+  if (saasDeploy) {
+    items.push({ key: 'saas', label: 'SaaS', href: saasHref })
   } else {
     items.push({ key: 'single', label: 'Одиночный инстанс', href: single })
-    items.push({ key: 'saas', label: 'SaaS', href: single })
   }
   if (rabbitHref) items.push({ key: 'rabbit', label: 'RabbitMQ', href: rabbitHref })
 
@@ -540,6 +561,38 @@ export function aggregateDiscoveryFromInstances(instances, maxSamples = 3) {
 }
 
 /**
+ * «Тег» окружения — значение метки отбора или имя ВМ без суффикса роли (как колонка Tag у сводной таблицы ВМ).
+ * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance} inst
+ * @param {string} labelKey
+ */
+function pickOteTag(inst, labelKey) {
+  const labels = inst.labels || {}
+  if (labelKey && Object.prototype.hasOwnProperty.call(labels, labelKey)) {
+    const v = labels[labelKey]
+    if (v !== undefined && v !== null && String(v).trim()) return String(v).trim()
+  }
+  const name = inst.name || ''
+  return name.replace(/-(app|everything)$/i, '') || name
+}
+
+/**
+ * Ключ группировки списка OTE: метка или поле metadata `groupBy`, иначе тег как в сводной таблице ВМ (pickOteTag).
+ * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance} inst
+ * @param {string} labelKey
+ * @param {string} groupByLabelKey
+ */
+export function resolveListGroupKey(inst, labelKey, groupByLabelKey) {
+  const gb = String(groupByLabelKey || '').trim()
+  if (!gb) return inst.id || ''
+  const labels = inst.labels || {}
+  if (labels[gb] !== undefined && labels[gb] !== null && String(labels[gb]).trim())
+    return String(labels[gb]).trim()
+  const meta = inst.metadata || {}
+  if (meta[gb] !== undefined && meta[gb] !== null && String(meta[gb]).trim()) return String(meta[gb]).trim()
+  return pickOteTag(inst, labelKey) || inst.id || ''
+}
+
+/**
  * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[]} instances
  * @param {{ labelKey: string, labelValue?: string, groupByLabelKey?: string, mvp?: object, actor?: { login?: string, email?: string } }} opts
  */
@@ -553,7 +606,7 @@ export function filterAndBuildListRows(instances, opts) {
   const key = String(groupByLabelKey).trim()
   const groups = new Map()
   for (const inst of filtered) {
-    const g = (inst.labels && inst.labels[key]) || inst.id
+    const g = resolveListGroupKey(inst, labelKey, key)
     if (!groups.has(g)) groups.set(g, [])
     groups.get(g).push(inst)
   }
@@ -656,21 +709,6 @@ function pickUsername(inst, usernameLabelKeys) {
     if (v !== undefined && v !== null && String(v).trim()) return String(v).trim()
   }
   return ''
-}
-
-/**
- * «Тег» окружения — значение метки отбора или имя ВМ без суффикса роли.
- * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance} inst
- * @param {string} labelKey
- */
-function pickOteTag(inst, labelKey) {
-  const labels = inst.labels || {}
-  if (labelKey && Object.prototype.hasOwnProperty.call(labels, labelKey)) {
-    const v = labels[labelKey]
-    if (v !== undefined && v !== null && String(v).trim()) return String(v).trim()
-  }
-  const name = inst.name || ''
-  return name.replace(/-(app|everything)$/i, '') || name
 }
 
 /**

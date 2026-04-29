@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-      <h1 class="text-[22px] font-extrabold text-slate-900">{{ isNew ? 'Новый шаблон' : 'Редактирование шаблона' }}</h1>
+      <h1 class="text-[22px] font-extrabold text-slate-900">{{ isNew ? 'Новый шаблон сборки' : 'Редактирование шаблона сборки' }}</h1>
       <NuxtLink
         to="/templates"
         class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-500 transition hover:border-slate-300 hover:text-slate-800"
@@ -18,19 +18,11 @@
       Загрузка…
     </div>
 
-    <div v-else class="max-w-[960px] space-y-6">
+    <div v-else class="max-w-[980px] space-y-6">
       <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-card">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-5">
-          <div class="min-w-0 flex-1">
-            <AppInput v-model="form.name" label="Название" placeholder="Автотесты, Windows single" autocomplete="off" />
-          </div>
-          <div class="w-full shrink-0 sm:w-52">
-            <AppSelect v-model="form.targetOs" class="w-full" label="Тип (ОС)" :options="osOptions" />
-          </div>
+        <div class="min-w-0">
+          <AppInput v-model="form.name" label="Название" placeholder="Windows SaaS · latest" autocomplete="off" />
         </div>
-        <p class="mt-2 max-w-xl text-xs font-semibold text-slate-500">
-          «Все» — шаблон виден при любой сборке. «Windows» / «Linux» — только при соответствующем пресете на странице создания OTE.
-        </p>
         <label
           class="mt-5 flex cursor-pointer items-start gap-3.5 rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50/90 to-violet-50/20 p-4 transition hover:border-violet-200/60 hover:shadow-sm"
         >
@@ -49,10 +41,28 @@
               </span>
             </span>
             <span class="mt-1.5 block text-xs font-semibold leading-relaxed text-slate-600">
-              Такой шаблон не попадает в журнал аудита и в списке каталога виден только вам. При создании OTE YAML по-прежнему уходит в TeamCity.
+              Такой шаблон не попадает в журнал аудита и в списке виден только вам.
             </span>
           </span>
         </label>
+
+        <div class="mt-5 grid gap-4 sm:grid-cols-2">
+          <AppInput v-model="form.teamcityBuildTypeId" label="TeamCity buildTypeId" placeholder="Some_BuildTypeId" autocomplete="off" />
+          <div class="flex flex-col justify-end">
+            <p class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Ссылка</p>
+            <a
+              v-if="computedTeamcityBuildUrl"
+              :href="computedTeamcityBuildUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-brand hover:underline"
+            >
+              Открыть в TeamCity
+            </a>
+            <p v-else class="mt-1 text-xs font-semibold text-slate-400">—</p>
+          </div>
+        </div>
+
         <div class="mt-5">
           <label class="mb-1.5 block text-sm font-bold text-slate-800">Описание (необязательно)</label>
           <textarea
@@ -62,6 +72,62 @@
             placeholder="Для кого и когда использовать шаблон…"
           />
         </div>
+
+        <div class="mt-6">
+          <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
+            <label class="block text-sm font-bold text-slate-800">Параметры (key/value)</label>
+            <AppButton size="sm" variant="secondary" class="!px-3 !py-1.5 !text-xs" @click="addParam">Добавить</AppButton>
+          </div>
+          <div class="overflow-hidden rounded-xl border border-slate-200">
+            <div class="overflow-x-auto">
+              <table class="min-w-[760px] w-full border-collapse text-sm">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                    <th class="px-3 py-2.5">Key</th>
+                    <th class="px-3 py-2.5">Value</th>
+                    <th class="px-3 py-2.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="!form.params.length">
+                    <td colspan="3" class="px-3 py-8 text-center text-xs font-semibold text-slate-500">
+                      Параметров нет. Добавьте key/value (например <span class="font-mono">metadata.tag</span>, <span class="font-mono">caseone.version</span>).
+                    </td>
+                  </tr>
+                  <tr v-for="(p, idx) in form.params" :key="idx" class="border-b border-slate-100 last:border-b-0">
+                    <td class="px-3 py-2.5 align-top">
+                      <input
+                        v-model="p.key"
+                        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono text-slate-800 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15"
+                        placeholder="metadata.tag"
+                      />
+                    </td>
+                    <td class="px-3 py-2.5 align-top">
+                      <input
+                        v-model="p.value"
+                        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono text-slate-800 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15"
+                        placeholder="my-ote-01"
+                      />
+                    </td>
+                    <td class="px-3 py-2.5 align-top">
+                      <button
+                        type="button"
+                        class="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-extrabold text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+                        @click="removeParam(idx)"
+                      >
+                        Удалить
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <p class="mt-2 text-xs font-semibold text-slate-500">
+            В YAML используйте подстановки вида <span class="font-mono">%metadata.tag%</span>. При запуске можно переопределить значения.
+          </p>
+        </div>
+
         <div class="mt-5">
           <label class="mb-1.5 block text-sm font-bold text-slate-800">YAML</label>
           <AppTextareaWithLineNumbers
@@ -78,6 +144,15 @@
         </div>
         <div class="mt-8 flex flex-wrap gap-3">
           <AppButton :loading="saving" @click="save">{{ isNew ? 'Создать' : 'Сохранить' }}</AppButton>
+          <AppButton
+            v-if="!isNew"
+            variant="danger"
+            :loading="deleting"
+            class="!bg-rose-600 !text-white hover:!bg-rose-700"
+            @click="del"
+          >
+            Удалить
+          </AppButton>
         </div>
       </div>
     </div>
@@ -86,7 +161,6 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { DEPLOYMENT_TEMPLATE_OS_OPTIONS } from '~/constants/deployment-template-os.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -98,13 +172,14 @@ const isNew = computed(() => idParam.value === 'new')
 const loading = ref(true)
 const loadError = ref('')
 const saving = ref(false)
-
-const osOptions = DEPLOYMENT_TEMPLATE_OS_OPTIONS
+const deleting = ref(false)
 
 const form = reactive({
   name: '',
-  targetOs: 'all',
   description: '',
+  teamcityBuildTypeId: '',
+  /** @type {{ key: string, value: string }[]} */
+  params: [],
   yaml: '',
   isPersonal: false,
 })
@@ -125,10 +200,13 @@ function formatUtc(iso) {
 
 function applyTemplate(t) {
   form.name = t.name || ''
-  const os = String(t.targetOs || '').toLowerCase()
-  form.targetOs = os === 'windows' || os === 'linux' ? os : 'all'
   form.description = t.description || ''
   form.yaml = t.yaml || ''
+  form.teamcityBuildTypeId = t.teamcityBuildTypeId || ''
+  const p = t.params && typeof t.params === 'object' ? t.params : {}
+  form.params = Object.entries(p)
+    .map(([key, value]) => ({ key: String(key || ''), value: value == null ? '' : String(value) }))
+    .filter((x) => x.key.trim())
   form.isPersonal = Boolean(t.isPersonal)
   meta.createdAt = t.createdAt || ''
   meta.updatedAt = t.updatedAt || ''
@@ -136,13 +214,24 @@ function applyTemplate(t) {
   meta.updatedByLogin = t.updatedByLogin || ''
 }
 
+const computedTeamcityBuildUrl = computed(() => {
+  const id = String(form.teamcityBuildTypeId || '').trim()
+  if (!id) return ''
+  // URL сохраняется на сервере автоматически; тут — удобный кликабельный вид
+  return `https://ci.pravo.tech/buildConfiguration/${encodeURIComponent(id)}`
+})
+
 async function loadOne() {
   if (isNew.value) {
     form.name = ''
-    form.targetOs = 'all'
     form.description = ''
     form.yaml =
       'metadata:\n  tag: "%metadata.tag%"\n  days_life: 1\n\ncaseone:\n  version: "%caseone.version%"\n'
+    form.teamcityBuildTypeId = ''
+    form.params = [
+      { key: 'metadata.tag', value: '' },
+      { key: 'caseone.version', value: 'latest' },
+    ]
     form.isPersonal = false
     meta.createdAt = ''
     meta.updatedAt = ''
@@ -155,7 +244,7 @@ async function loadOne() {
   loading.value = true
   loadError.value = ''
   try {
-    const res = await $fetch(`/api/ote/templates/${encodeURIComponent(idParam.value)}`, { credentials: 'include' })
+    const res = await $fetch(`/api/ote/build-templates/${encodeURIComponent(idParam.value)}`, { credentials: 'include' })
     const t = res?.template
     if (!t) {
       loadError.value = 'Шаблон не найден'
@@ -183,14 +272,22 @@ onMounted(() => {
 async function save() {
   saving.value = true
   try {
+    /** @type {Record<string, string>} */
+    const params = {}
+    for (const p of form.params) {
+      const k = String(p?.key || '').trim()
+      if (!k) continue
+      params[k] = p?.value == null ? '' : String(p.value)
+    }
     if (isNew.value) {
-      const res = await $fetch('/api/ote/templates', {
+      const res = await $fetch('/api/ote/build-templates', {
         method: 'POST',
         credentials: 'include',
         body: {
           name: form.name,
-          targetOs: form.targetOs,
           description: form.description,
+          teamcityBuildTypeId: form.teamcityBuildTypeId,
+          params,
           yaml: form.yaml,
           isPersonal: form.isPersonal,
         },
@@ -204,13 +301,14 @@ async function save() {
       await router.replace(`/templates/${id}`)
       return
     }
-    const res = await $fetch(`/api/ote/templates/${encodeURIComponent(idParam.value)}`, {
+    const res = await $fetch(`/api/ote/build-templates/${encodeURIComponent(idParam.value)}`, {
       method: 'PUT',
       credentials: 'include',
       body: {
         name: form.name,
-        targetOs: form.targetOs,
         description: form.description,
+        teamcityBuildTypeId: form.teamcityBuildTypeId,
+        params,
         yaml: form.yaml,
         isPersonal: form.isPersonal,
       },
@@ -225,5 +323,31 @@ async function save() {
   }
 }
 
-useHead(() => ({ title: isNew.value ? 'Новый шаблон · OTE Manager' : `Шаблон · OTE Manager` }))
+function addParam() {
+  form.params.push({ key: '', value: '' })
+}
+
+function removeParam(idx) {
+  form.params.splice(idx, 1)
+}
+
+async function del() {
+  if (deleting.value) return
+  if (isNew.value) return
+  deleting.value = true
+  try {
+    await $fetch(`/api/ote/build-templates/${encodeURIComponent(idParam.value)}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    })
+    toast.show('Шаблон удалён', 'success')
+    await router.push('/templates')
+  } catch (e) {
+    toast.show(e?.data?.message || e?.message || String(e), 'error')
+  } finally {
+    deleting.value = false
+  }
+}
+
+useHead(() => ({ title: isNew.value ? 'Новый шаблон сборки · OTE Manager' : `Шаблон сборки · OTE Manager` }))
 </script>

@@ -130,11 +130,11 @@ function labelFor(code) {
   return auditActionLabel(code)
 }
 
-/** Ссылка из колонки «Ресурс»: шаблоны деплоя → /templates/:id, иначе карточка OTE */
+/** Ссылка из колонки «Ресурс»: шаблоны сборок → /templates/:id, иначе карточка OTE */
 function resourceHref(oteResourceId) {
   if (!oteResourceId) return '/'
   const s = String(oteResourceId)
-  const m = /^deploy-template:(\d+)$/.exec(s)
+  const m = /^build-template:(\d+)$/.exec(s)
   if (m) return `/templates/${m[1]}`
   return `/environments/${encodeURIComponent(s)}`
 }

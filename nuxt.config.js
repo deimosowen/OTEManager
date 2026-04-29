@@ -36,6 +36,18 @@ function mergeEnvFile(relativeName) {
 mergeEnvFile('.env')
 mergeEnvFile('.env.local')
 
+/** Версия из package.json — для страницы «О проекте» и публичного runtimeConfig */
+let appVersionFromPackage = '0.0.0'
+try {
+  const pkgPath = resolve(__nuxtRoot, 'package.json')
+  if (existsSync(pkgPath)) {
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))
+    if (pkg && typeof pkg.version === 'string' && pkg.version) appVersionFromPackage = pkg.version
+  }
+} catch {
+  /* ignore */
+}
+
 for (const k of Object.keys(_envFromFiles)) {
   process.env[k] = _envFromFiles[k]
 }
@@ -179,6 +191,8 @@ export default defineNuxtConfig({
        * Можно задать отдельно, если UI и API на разных хостах.
        */
       teamcityUiBaseUrl: envPick('NUXT_PUBLIC_TC_UI_BASE_URL', 'https://ci.pravo.tech').replace(/\/+$/, ''),
+      /** Семантическая версия приложения (из package.json на этапе сборки) */
+      appVersion: appVersionFromPackage,
     },
   },
   /**

@@ -42,7 +42,36 @@ export async function initDatabase(config) {
   const client = createClient({ url })
   const db = drizzle(client, { schema })
   const migrationsFolder = resolveMigrationsDir(config?.sqliteMigrationsDir)
+  // Лог старта БД помогает быстро понять, какая БД/миграции реально используются.
+  // (в dev часто удаляют не тот файл или переопределяют NUXT_SQLITE_MIGRATIONS_DIR)
+  // eslint-disable-next-line no-console
+  console.log('[db] sqlitePath:', filePath)
+  // eslint-disable-next-line no-console
+  console.log('[db] migrationsFolder:', migrationsFolder)
   await migrate(db, { migrationsFolder })
+
+  // Smoke-check: миграции обязаны создать новые таблицы/колонки.
+  // Если этого не произошло (например, устаревший meta/_journal.json в артефакте),
+  // лучше упасть при старте с понятным сообщением, чем ловить "no such table" в UI.
+  try {
+    const t = await client.execute({
+      sql: "select name from sqlite_master where type='table' and name = ? limit 1",
+      args: ['ote_build_templates'],
+    })
+    const hasBuildTemplates = Array.isArray(t.rows) && t.rows.length > 0
+    if (!hasBuildTemplates) {
+      throw new Error(
+        `Не применились миграции: нет таблицы ote_build_templates. ` +
+          `Проверьте, что папка миграций содержит 0009_ote_build_templates.sql и meta/_journal.json включает её. ` +
+          `sqlitePath=${filePath}; migrationsFolder=${migrationsFolder}`,
+      )
+    }
+  } catch (e) {
+    const msg = e?.message || String(e)
+    // eslint-disable-next-line no-console
+    console.error('[db] migration check failed:', msg)
+    throw e
+  }
   dbInstance = db
   return dbInstance
 }

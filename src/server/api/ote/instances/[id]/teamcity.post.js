@@ -81,10 +81,14 @@ export default defineEventHandler(async (event) => {
 
   try {
     const authorization = await resolveTeamCityAuthorizationHeader(config, { user })
+    const properties = { 'metadata.tag': metadataTag }
+    if (action === 'delete') {
+      properties['delete.exact_match'] = 'true'
+    }
     const tc = await queueTeamCityBuild({
       config,
       buildTypeId,
-      properties: { 'metadata.tag': metadataTag },
+      properties,
       authorization,
     })
     const tcAuthUserKey = integrationUserKey(user)

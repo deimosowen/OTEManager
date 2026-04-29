@@ -1,12 +1,12 @@
 <template>
   <div>
     <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-      <h1 class="text-[22px] font-extrabold text-slate-900">Шаблоны деплоя</h1>
+      <h1 class="text-[22px] font-extrabold text-slate-900">Шаблоны сборок</h1>
       <AppButton @click="goNew">Новый шаблон</AppButton>
     </div>
 
     <p class="mb-4 max-w-3xl text-sm font-semibold text-slate-600">
-      YAML-конфигурации для создания OTE через TeamCity.
+      Редактор YAML + конфигурация TeamCity (build) + параметры для подстановок и запуска создания OTE.
     </p>
 
     <div v-if="error" class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">
@@ -35,11 +35,11 @@
 
     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
       <div class="overflow-x-auto">
-        <table class="min-w-[880px] w-full border-collapse text-sm">
+        <table class="min-w-[980px] w-full border-collapse text-sm">
           <thead>
             <tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
               <th class="px-4 py-3">Название</th>
-              <th class="px-4 py-3">Тип (ОС)</th>
+              <th class="px-4 py-3">TeamCity</th>
               <th class="px-4 py-3">Доступ</th>
               <th class="px-4 py-3">Изменён (UTC)</th>
               <th class="px-4 py-3">Автор изменения</th>
@@ -64,8 +64,18 @@
                   <PersonalTemplateBadge v-if="r.isPersonal" class="shrink-0" />
                 </div>
               </td>
-              <td class="whitespace-nowrap px-4 py-2.5 text-sm font-semibold text-slate-700">
-                {{ osLabel(r.targetOs) }}
+              <td class="px-4 py-2.5 font-mono text-xs text-slate-700">
+                <a
+                  v-if="r.teamcityBuildConfigUrl"
+                  :href="r.teamcityBuildConfigUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="font-bold text-brand hover:underline"
+                >
+                  build
+                </a>
+                <span class="mx-2 text-slate-300">·</span>
+                <span>{{ r.teamcityBuildTypeId || '—' }}</span>
               </td>
               <td class="whitespace-nowrap px-4 py-2.5">
                 <span
@@ -98,7 +108,6 @@
 <script setup>
 import { Lock, Users } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
-import { labelDeploymentTemplateOs } from '~/constants/deployment-template-os.js'
 
 const router = useRouter()
 
@@ -112,10 +121,6 @@ const personalFilterOptions = [
   { value: 'no', label: 'Только общие' },
   { value: 'yes', label: 'Только личные' },
 ]
-
-function osLabel(v) {
-  return labelDeploymentTemplateOs(v)
-}
 
 function formatUtc(iso) {
   if (!iso) return '—'
@@ -138,7 +143,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const res = await $fetch('/api/ote/templates', {
+    const res = await $fetch('/api/ote/build-templates', {
       credentials: 'include',
       query: { personal: personalFilter.value },
     })

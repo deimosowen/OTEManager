@@ -1,5 +1,5 @@
 import { runtimeConfigString } from './config-helpers.js'
-import { instanceMatchesLabelFilter, listAllInstancesInFolder } from './compute.js'
+import { instanceMatchesLabelFilter, listAllInstancesInFolder, resolveListGroupKey } from './compute.js'
 
 /**
  * Все ВМ, входящие в эту OTE (одна ВМ по id или группа по `grp:` + метка группировки).
@@ -18,7 +18,7 @@ export async function listMemberInstancesForOteId(session, folderId, id, config)
     const groupKey = decodeURIComponent(id.slice(4))
     return all.filter((inst) => {
       if (!instanceMatchesLabelFilter(inst, labelKey, labelValue)) return false
-      const gval = (inst.labels && inst.labels[gb]) || inst.id
+      const gval = resolveListGroupKey(inst, labelKey, gb)
       return gval === groupKey
     })
   }

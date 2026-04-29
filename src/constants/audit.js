@@ -22,6 +22,9 @@ export const AUDIT_ACTION = {
   OTE_POWER_STOP: 'ote_power_stop',
   OTE_DEPLOY_TEMPLATE_CREATE: 'ote_deploy_template_create',
   OTE_DEPLOY_TEMPLATE_UPDATE: 'ote_deploy_template_update',
+  OTE_BUILD_TEMPLATE_CREATE: 'ote_build_template_create',
+  OTE_BUILD_TEMPLATE_UPDATE: 'ote_build_template_update',
+  OTE_BUILD_TEMPLATE_DELETE: 'ote_build_template_delete',
 }
 
 /** @type {Record<string, string>} */
@@ -39,6 +42,9 @@ export const AUDIT_ACTION_LABELS = {
   [AUDIT_ACTION.OTE_POWER_STOP]: 'Остановка ВМ (очередь)',
   [AUDIT_ACTION.OTE_DEPLOY_TEMPLATE_CREATE]: 'Шаблон деплоя: создание',
   [AUDIT_ACTION.OTE_DEPLOY_TEMPLATE_UPDATE]: 'Шаблон деплоя: изменение',
+  [AUDIT_ACTION.OTE_BUILD_TEMPLATE_CREATE]: 'Шаблон сборки: создание',
+  [AUDIT_ACTION.OTE_BUILD_TEMPLATE_UPDATE]: 'Шаблон сборки: изменение',
+  [AUDIT_ACTION.OTE_BUILD_TEMPLATE_DELETE]: 'Шаблон сборки: удаление',
 }
 
 /**

@@ -1,20 +1,19 @@
 import { AUDIT_ACTION } from '@app-constants/audit.js'
-import { getOteCreationPreset } from '@app-constants/ote-creation-presets.js'
+import { eq } from 'drizzle-orm'
 import { getDb } from '../../../db/client.js'
-import { oteTcCreations } from '../../../db/schema.js'
-import { fetchDeploymentTemplateYamlIfVisible } from '../../../utils/deployment-template-access.js'
+import { oteBuildTemplates, oteTcCreations } from '../../../db/schema.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../utils/audit-log.js'
+import { mergeBuildTemplateOverrides, parseBuildTemplateParams } from '../../../utils/build-template-params.js'
+import { renderYamlPercentPlaceholders } from '../../../utils/build-template-render.js'
 import { integrationUserKey } from '../../../utils/integrations/user-credentials.js'
 import { rowToPublic } from '../../../utils/ote-tc-creation-sync.js'
 import { requireOteUser } from '../../../utils/require-ote-auth.js'
-import { parseDeploymentTemplateId } from '../../../utils/ote-create-deployment-template-id.js'
 import { queueTeamCityBuild } from '../../../utils/teamcity/client.js'
 import { isTeamCityAuthAvailable, resolveTeamCityAuthorizationHeader } from '../../../utils/teamcity/resolve-auth.js'
 
 /**
  * Поставить сборку создания OTE в TeamCity и сохранить запись в `ote_tc_creations`.
- * Тело: `{ presetId, properties, deploymentTemplateId? }`.
- * Если задан `deploymentTemplateId`, для поля `default_deploymet_config_template` в TeamCity подставляется YAML из БД.
+ * Тело: `{ buildTemplateId, overrides? }`.
  */
 export default defineEventHandler(async (event) => {
   const user = requireOteUser(event)
@@ -28,67 +27,63 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const presetId = body && typeof body.presetId === 'string' ? body.presetId.trim() : ''
-  const preset = presetId ? getOteCreationPreset(presetId) : null
-  if (!preset) {
-    throw createError({ statusCode: 400, message: 'Неизвестный presetId' })
-  }
-
-  const propsIn =
-    body && typeof body.properties === 'object' && body.properties ? { ...body.properties } : {}
-  const deploymentTemplateId = parseDeploymentTemplateId(body?.deploymentTemplateId)
-  if (deploymentTemplateId) {
-    delete propsIn.default_deploymet_config_template
+  const rawId = body?.buildTemplateId
+  const buildTemplateId = Number(String(rawId ?? '').trim())
+  if (!Number.isFinite(buildTemplateId) || buildTemplateId < 1) {
+    throw createError({ statusCode: 400, message: 'Некорректный buildTemplateId' })
   }
 
   const db = getDb()
   const userKey = integrationUserKey(user)
-
-  /** YAML из каталога шаблонов (целиком уходит в default_deploymet_config_template в TeamCity). */
-  let injectedTemplateYaml = null
-  const presetUsesTemplateCatalog = preset.fields.some((f) => f.type === 'template_select')
-  if (deploymentTemplateId && presetUsesTemplateCatalog) {
-    const yamlStr = await fetchDeploymentTemplateYamlIfVisible(db, deploymentTemplateId, userKey)
-    if (!yamlStr) {
-      throw createError({ statusCode: 400, message: 'Шаблон не найден или недоступен' })
-    }
-    if (!yamlStr.trim()) {
-      throw createError({ statusCode: 400, message: 'У шаблона пустой YAML' })
-    }
-    injectedTemplateYaml = yamlStr
+  const rows = await db
+    .select()
+    .from(oteBuildTemplates)
+    .where(eq(oteBuildTemplates.id, buildTemplateId))
+    .limit(1)
+  const tpl = rows[0]
+  if (!tpl) {
+    throw createError({ statusCode: 404, message: 'Шаблон не найден' })
+  }
+  if (!('isPersonal' in tpl) || (tpl.isPersonal === 1 && tpl.createdByLogin !== userKey)) {
+    throw createError({ statusCode: 403, message: 'Нет доступа к этому шаблону' })
   }
 
   /** @type {Record<string, string>} */
-  const tcProps = {}
-  for (const f of preset.fields) {
-    if (f.type === 'template_select' && injectedTemplateYaml != null) {
-      tcProps[f.name] = injectedTemplateYaml
-      continue
-    }
-
-    const raw = propsIn[f.name]
-    const s = raw == null ? '' : String(raw)
-    if (f.type === 'template_select') {
-      if (f.required && !s.trim()) {
-        throw createError({ statusCode: 400, message: `Заполните поле: ${f.label}` })
-      }
-      if (s.trim()) tcProps[f.name] = s
-      continue
-    }
-
-    const trimmed = String(s).trim()
-    if (f.required && !trimmed) {
-      throw createError({ statusCode: 400, message: `Заполните поле: ${f.label}` })
-    }
-    if (trimmed) tcProps[f.name] = trimmed
+  let baseParams = {}
+  try {
+    baseParams = parseBuildTemplateParams(JSON.parse(String(tpl.paramsJson || '{}')))
+  } catch {
+    baseParams = {}
   }
+
+  let merged = {}
+  try {
+    merged = mergeBuildTemplateOverrides(baseParams, body?.overrides)
+  } catch (e) {
+    throw createError({ statusCode: 400, message: e?.message || String(e) })
+  }
+
+  let renderedYaml = ''
+  try {
+    renderedYaml = renderYamlPercentPlaceholders(String(tpl.yamlBody || ''), merged)
+  } catch (e) {
+    throw createError({ statusCode: 400, message: e?.message || String(e) })
+  }
+
+  /** @type {Record<string, string>} */
+  const tcProps = { ...merged }
+  tcProps.default_deploymet_config_template = renderedYaml
 
   const authorization = await resolveTeamCityAuthorizationHeader(config, { user })
   let tc
+  const buildTypeId = String(tpl.teamcityBuildTypeId || '').trim()
+  if (!buildTypeId) {
+    throw createError({ statusCode: 500, message: 'У шаблона не задан teamcityBuildTypeId' })
+  }
   try {
     tc = await queueTeamCityBuild({
       config,
-      buildTypeId: preset.buildTypeId,
+      buildTypeId,
       properties: tcProps,
       authorization,
     })
@@ -99,7 +94,7 @@ export default defineEventHandler(async (event) => {
         actionCode: AUDIT_ACTION.OTE_CREATE_TC_FAILED,
         oteResourceId: null,
         oteTag: tcProps['metadata.tag'] || null,
-        details: { stage: 'queue', presetId: preset.id, buildTypeId: preset.buildTypeId, error: msg },
+        details: { stage: 'queue', buildTemplateId, buildTypeId, error: msg },
       }),
     )
     throw createError({ statusCode: 502, message: msg })
@@ -116,12 +111,16 @@ export default defineEventHandler(async (event) => {
       updatedAt: now,
       actorLogin: integrationUserKey(user),
       actorEmail: String(user.email || '').trim(),
-      presetId: preset.id,
-      buildTypeId: preset.buildTypeId,
+      presetId: 'build-template',
+      buildTypeId,
       teamcityBuildId: buildId || null,
       teamcityWebUrl: tc.webUrl ? String(tc.webUrl).trim() : null,
       status: failedQueue ? 'failed' : 'queued',
       requestPropertiesJson: JSON.stringify(tcProps),
+      buildTemplateId,
+      requestTemplateYaml: String(tpl.yamlBody || ''),
+      requestRenderedYaml: renderedYaml,
+      requestParamsJson: JSON.stringify(merged),
       lastError: failedQueue ? 'TeamCity не вернул идентификатор сборки' : null,
     })
     .returning()
@@ -139,8 +138,8 @@ export default defineEventHandler(async (event) => {
         details: {
           stage: 'queue_empty_build_id',
           creationId: created.id,
-          presetId: preset.id,
-          buildTypeId: preset.buildTypeId,
+          buildTemplateId,
+          buildTypeId,
           teamcityHref: tc.href || null,
         },
       }),
@@ -153,8 +152,8 @@ export default defineEventHandler(async (event) => {
         oteTag: tcProps['metadata.tag'] || null,
         details: {
           creationId: created.id,
-          presetId: preset.id,
-          buildTypeId: preset.buildTypeId,
+          buildTemplateId,
+          buildTypeId,
           teamcityBuildId: buildId,
           teamcityWebUrl: tc.webUrl || null,
         },

@@ -19,7 +19,7 @@
     </div>
 
     <OteFiltersBar
-      v-if="store.listSource !== 'pending' && (store.listSource !== 'yc' || ycView === 'mvp')"
+      v-if="store.listSource !== 'pending'"
       :model-value="store.filters"
       :product-options="store.productOptions"
       :type-options="store.typeOptions"
@@ -40,14 +40,9 @@
     </section>
 
     <template v-else-if="store.listSource === 'yc'">
-      <div class="mb-4 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
-        <button type="button" :class="ycTabClass(ycView === 'mvp')" @click="ycView = 'mvp'">Список OTE</button>
-        <button type="button" :class="ycTabClass(ycView === 'tc')" @click="ycView = 'tc'">ВМ и квоты</button>
-      </div>
-      <OteMvpYcTable v-show="ycView === 'mvp'" :rows="store.filteredItems" />
-      <OteTeamCityReportTable v-show="ycView === 'tc' && store.tcTable" :tc-table="store.tcTable" />
+      <OteMvpYcTable :rows="store.filteredItems" />
+      <OteInstancesSummaryBlock v-if="store.tcTable?.summary" :summary="store.tcTable.summary" class="mt-4" />
       <details
-        v-if="ycView === 'mvp'"
         class="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-700"
         @toggle="onDiscoverToggle"
       >
@@ -84,8 +79,6 @@ import { OTE_STATUS } from '~/constants/ote'
 const store = useEnvironmentsStore()
 const toast = useToast()
 
-/** Вкладка при данных из YC: MVP-список или таблица TeamCity */
-const ycView = ref('mvp')
 const discoverPayload = ref('')
 const discoverLoading = ref(false)
 const discoverError = ref('')
@@ -94,18 +87,11 @@ watch(
   () => store.listSource,
   (src) => {
     if (src !== 'yc') {
-      ycView.value = 'mvp'
       discoverPayload.value = ''
       discoverError.value = ''
     }
   },
 )
-
-function ycTabClass(active) {
-  return active
-    ? 'rounded-lg bg-brand px-4 py-2 text-sm font-bold text-white shadow transition hover:bg-brand-dark'
-    : 'rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50'
-}
 
 async function onDiscoverToggle(ev) {
   const el = ev.target
