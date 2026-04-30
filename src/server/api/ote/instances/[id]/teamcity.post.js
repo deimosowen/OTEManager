@@ -1,5 +1,7 @@
 import { AUDIT_ACTION } from '@app-constants/audit.js'
+import { getDb } from '../../../../db/client.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../../utils/audit-log.js'
+import { assertMetadataTagNotBlockedByOteCreation } from '../../../../utils/ote-tc-creation-guard.js'
 import { markTcPending, peekTcPending } from '../../../../utils/ote-tc-pending.js'
 import { requireOteUser } from '../../../../utils/require-ote-auth.js'
 import { integrationUserKey } from '../../../../utils/integrations/user-credentials.js'
@@ -68,6 +70,8 @@ export default defineEventHandler(async (event) => {
       message: `Не удалось определить metadata.tag (метка «${labelKey}» на ВМ)`,
     })
   }
+
+  await assertMetadataTagNotBlockedByOteCreation(getDb(), metadataTag)
 
   const buildTypeId =
     action === 'start'

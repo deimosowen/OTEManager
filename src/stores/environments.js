@@ -10,7 +10,13 @@ function newId(list) {
 }
 
 /** Поля карточки, которых нет в «лёгком» ответе списка — не затирать при refresh списка. */
-const OTE_DETAIL_PRESERVE_KEYS = /** @type {const} */ (['vmBuildLogRows', 'tcConfigText', 'ycLabelSections', 'tcOperationPending'])
+const OTE_DETAIL_PRESERVE_KEYS = /** @type {const} */ ([
+  'vmBuildLogRows',
+  'tcConfigText',
+  'ycLabelSections',
+  'tcOperationPending',
+  'oteTcCreationBlocking',
+])
 
 function hasVmBuildRows(val) {
   return Array.isArray(val) && val.length > 0
@@ -37,7 +43,7 @@ function mergeOteClientRow(prev, incoming) {
       if (!Array.isArray(nextVal) || !nextVal.length) {
         if (Array.isArray(prevVal) && prevVal.length) out[k] = prevVal
       }
-    } else if (k === 'tcOperationPending') {
+    } else if (k === 'tcOperationPending' || k === 'oteTcCreationBlocking') {
       if (!Object.prototype.hasOwnProperty.call(incoming, k) && prevVal != null) out[k] = prevVal
     }
   }

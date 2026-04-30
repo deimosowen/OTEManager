@@ -108,13 +108,18 @@
         </div>
       </section>
 
-      <div class="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-card ring-1 ring-slate-900/5">
-        <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <h2 id="create-template-heading" class="text-sm font-extrabold text-slate-900">Шаблон сборки</h2>
-          <div class="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+      <div class="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-card ring-1 ring-slate-900/5 sm:p-8">
+        <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100/90 pb-5">
+          <div class="min-w-0">
+            <h2 id="create-template-heading" class="text-base font-extrabold tracking-tight text-slate-900">Шаблон сборки</h2>
+            <p class="mt-1 text-[13px] font-medium leading-snug text-slate-500">
+              Выберите конфигурацию и при необходимости измените параметры ниже.
+            </p>
+          </div>
+          <div class="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-2 sm:gap-x-4">
             <NuxtLink
               to="/templates"
-              class="text-xs font-bold text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand"
+              class="rounded-lg px-2 py-1 text-xs font-bold text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand"
             >
               Управление шаблонами
             </NuxtLink>
@@ -131,6 +136,8 @@
             <span v-else class="text-xs font-semibold text-slate-500">—</span>
           </div>
         </div>
+
+        <div class="pt-6">
 
         <!-- Классический выбор: select -->
         <div v-if="viewMode === 'classic'">
@@ -204,69 +211,77 @@
           </div>
         </div>
 
-        <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200/90 bg-white ring-1 ring-slate-900/[0.04]">
-          <button
-            type="button"
-            class="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50/90"
-            :aria-expanded="overridesPanelOpen"
-            aria-controls="create-overrides-panel"
-            @click="overridesPanelOpen = !overridesPanelOpen"
-          >
-            <span class="flex min-w-0 items-center gap-2.5">
-              <ChevronDown
-                class="size-5 shrink-0 text-slate-500 transition-transform duration-200"
-                :class="overridesPanelOpen ? '' : '-rotate-90'"
-                aria-hidden="true"
-              />
-              <span class="text-sm font-extrabold text-slate-900">Параметры (overrides)</span>
-            </span>
+        </div>
+
+        <div class="mt-8 rounded-2xl bg-slate-50/90 p-5 ring-1 ring-slate-900/[0.04] sm:p-6">
+          <div class="flex flex-wrap items-start gap-3 sm:items-center sm:justify-between sm:gap-4">
+            <button
+              type="button"
+              class="flex min-w-0 flex-1 items-start gap-3 rounded-xl text-left transition hover:bg-white/60 sm:items-center"
+              :aria-expanded="overridesPanelOpen"
+              aria-controls="create-overrides-panel"
+              @click="overridesPanelOpen = !overridesPanelOpen"
+            >
+              <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200/80">
+                <SlidersHorizontal class="size-[18px] text-brand" aria-hidden="true" />
+              </span>
+              <span class="min-w-0 flex-1 pt-0.5 sm:pt-0">
+                <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <ChevronDown
+                    class="size-4 shrink-0 text-slate-400 transition-transform duration-200"
+                    :class="overridesPanelOpen ? '' : '-rotate-90'"
+                    aria-hidden="true"
+                  />
+                  <span class="text-[15px] font-extrabold leading-snug text-slate-900">Параметры</span>
+                  <span class="rounded-md bg-slate-200/80 px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-slate-600">overrides</span>
+                </span>
+                <span class="mt-1 block text-[13px] font-medium leading-snug text-slate-500">
+                  Подстановка значений в YAML перед отправкой в TeamCity.
+                </span>
+              </span>
+            </button>
             <NuxtLink
               v-if="currentTemplate"
               :to="`/templates/${currentTemplate.id}`"
-              class="shrink-0 text-xs font-bold text-brand hover:underline"
-              @click.stop
+              class="shrink-0 rounded-lg px-2 py-1.5 text-xs font-bold text-brand transition hover:bg-white/80 hover:underline sm:ml-0"
             >
               Открыть шаблон
             </NuxtLink>
-          </button>
+          </div>
 
           <div
             v-show="overridesPanelOpen"
             id="create-overrides-panel"
-            class="border-t border-slate-100 px-4 pb-4 pt-1"
+            class="mt-5 space-y-5 border-t border-slate-200/60 pt-5"
           >
-            <div class="overflow-hidden rounded-xl border border-slate-200">
-              <div class="overflow-x-auto">
-                <table class="min-w-[760px] w-full border-collapse text-sm">
-                  <thead>
-                    <tr class="border-b border-slate-200 bg-slate-50 text-left text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      <th class="px-3 py-2.5">Key</th>
-                      <th class="px-3 py-2.5">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-if="!overrideRows.length">
-                      <td colspan="2" class="px-3 py-8 text-center text-xs font-semibold text-slate-500">Нет параметров в шаблоне</td>
-                    </tr>
-                    <tr v-for="r in overrideRows" :key="r.key" class="border-b border-slate-100 last:border-b-0">
-                      <td class="px-3 py-2.5 align-top font-mono text-xs text-slate-800">{{ r.key }}</td>
-                      <td class="px-3 py-2.5 align-top">
-                        <input
-                          v-model="overrides[r.key]"
-                          class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-mono text-slate-800 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15"
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+            <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-900/[0.06]">
+              <div v-if="!overrideRows.length" class="px-5 py-10 text-center text-sm font-medium text-slate-500">
+                В шаблоне не задано ни одного параметра.
               </div>
+              <ul v-else class="divide-y divide-slate-100">
+                <li
+                  v-for="r in overrideRows"
+                  :key="r.key"
+                  class="px-4 py-4 sm:grid sm:grid-cols-[minmax(0,220px)_minmax(280px,1fr)] sm:items-start sm:gap-x-8 sm:gap-y-1"
+                >
+                  <div class="mb-2 sm:mb-0 sm:pt-1">
+                    <p class="font-mono text-[13px] font-semibold leading-snug text-slate-800">{{ r.key }}</p>
+                  </div>
+                  <input
+                    v-model="overrides[r.key]"
+                    class="w-full rounded-xl border border-slate-200/90 bg-slate-50/50 px-3.5 py-2.5 text-sm font-mono text-slate-800 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                </li>
+              </ul>
             </div>
 
-            <p v-if="yamlPreviewError" class="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
+            <p v-if="yamlPreviewError" class="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
               {{ yamlPreviewError }}
             </p>
 
-            <details v-if="currentTemplate" class="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <details v-if="currentTemplate" class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
               <summary class="cursor-pointer text-sm font-extrabold text-slate-800 [&::-webkit-details-marker]:hidden">
                 YAML предпросмотр
               </summary>
@@ -277,7 +292,7 @@
           </div>
         </div>
 
-        <div class="mt-6 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
+        <div class="mt-8 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
           <NuxtLink
             to="/"
             class="inline-flex min-h-[40px] min-w-[100px] items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
@@ -357,7 +372,16 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ChevronDown, Clock, ExternalLink, LayoutGrid, LayoutList, Star, Terminal } from 'lucide-vue-next'
+import {
+  ChevronDown,
+  Clock,
+  ExternalLink,
+  LayoutGrid,
+  LayoutList,
+  SlidersHorizontal,
+  Star,
+  Terminal,
+} from 'lucide-vue-next'
 import { oteTcCreationStatusClass, oteTcCreationStatusLabel } from '~/utils/ote-tc-creation-status.js'
 import { useOteTemplateShortcuts } from '~/composables/useOteTemplateShortcuts.js'
 

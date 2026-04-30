@@ -3,17 +3,25 @@ import { instanceMatchesLabelFilter, listAllInstancesInFolder, resolveListGroupK
 
 /**
  * Все ВМ, входящие в эту OTE (одна ВМ по id или группа по `grp:` + метка группировки).
+ *
+ * Если передать `preloadedInstances` — не вызывает `listAllInstancesInFolder` повторно
+ * (нужно для `GET /api/ote/instances`, где уже есть список каталога).
+ *
  * @param {import('@yandex-cloud/nodejs-sdk').Session} session
  * @param {string} folderId
  * @param {string} id id ВМ или `grp:…`
  * @param {import('@nuxt/schema').NitroRuntimeConfig} config
+ * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[] | undefined} [preloadedInstances]
  */
-export async function listMemberInstancesForOteId(session, folderId, id, config) {
+export async function listMemberInstancesForOteId(session, folderId, id, config, preloadedInstances = undefined) {
   const labelKey =
     runtimeConfigString(config.ycInstanceLabelKey, 'NUXT_YC_INSTANCE_LABEL_KEY') || 'metadata-tag'
   const labelValue = runtimeConfigString(config.ycInstanceLabelValue, 'NUXT_YC_INSTANCE_LABEL_VALUE')
   const gb = runtimeConfigString(config.ycGroupByLabelKey, 'NUXT_YC_GROUP_BY_LABEL_KEY') || 'metadata-tag'
-  const all = await listAllInstancesInFolder(session, folderId)
+  const all =
+    Array.isArray(preloadedInstances)
+      ? preloadedInstances
+      : await listAllInstancesInFolder(session, folderId)
   if (id.startsWith('grp:')) {
     const groupKey = decodeURIComponent(id.slice(4))
     return all.filter((inst) => {

@@ -1,4 +1,7 @@
+import { getDb } from '../../db/client.js'
 import { requireOteUser } from '../../utils/require-ote-auth.js'
+import { findBlockingOteTcCreationForMetadataTag } from '../../utils/ote-tc-creation-guard.js'
+import { pickMetadataTagFromMembers } from '../../utils/teamcity/metadata-tag.js'
 import { runtimeConfigString } from '../../utils/yc/config-helpers.js'
 import { createYandexCloudSession } from '../../utils/yc/session.js'
 import {
@@ -45,11 +48,28 @@ export default defineEventHandler(async (event) => {
     mvp,
     actor: { login: user.login || '', email: user.email || '' },
   })
-  for (const item of items) {
-    const members = await listMemberInstancesForOteId(session, folderId, item.id, config)
-    const pend = await resolveTcPendingState(item.id, members, config)
-    item.tcOperationPending = pend || null
-  }
+  const db = getDb()
+  /** Один общий список ВМ; без этого на каждую OTE уходило бы повторное listAllInstancesInFolder (очень медленно). */
+  await Promise.all(
+    items.map(async (item) => {
+      const members = await listMemberInstancesForOteId(session, folderId, item.id, config, all)
+      const pend = await resolveTcPendingState(item.id, members, config)
+      item.tcOperationPending = pend || null
+      const metaTag = pickMetadataTagFromMembers(members, labelKey)
+      try {
+        const hit = metaTag ? await findBlockingOteTcCreationForMetadataTag(db, metaTag) : null
+        item.oteTcCreationBlocking = hit
+          ? {
+              id: hit.id,
+              teamcityBuildId: hit.teamcityBuildId,
+              teamcityWebUrl: hit.teamcityWebUrl,
+            }
+          : null
+      } catch {
+        item.oteTcCreationBlocking = null
+      }
+    }),
+  )
   const filtered = all.filter((i) => instanceMatchesLabelFilter(i, labelKey, labelValue))
   const quotaCpu = Number(runtimeConfigString(config.ycQuotaMaxCpu, 'NUXT_YC_QUOTA_MAX_CPU'))
   const quotaMem = Number(runtimeConfigString(config.ycQuotaMaxMemoryGb, 'NUXT_YC_QUOTA_MAX_MEMORY_GB'))

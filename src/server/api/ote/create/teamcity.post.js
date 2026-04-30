@@ -144,21 +144,6 @@ export default defineEventHandler(async (event) => {
         },
       }),
     )
-  } else {
-    await recordAuditEvent(
-      auditPayloadFromUser(user, {
-        actionCode: AUDIT_ACTION.OTE_CREATE_TC_QUEUE,
-        oteResourceId: `tc-creation:${created.id}`,
-        oteTag: tcProps['metadata.tag'] || null,
-        details: {
-          creationId: created.id,
-          buildTemplateId,
-          buildTypeId,
-          teamcityBuildId: buildId,
-          teamcityWebUrl: tc.webUrl || null,
-        },
-      }),
-    )
   }
 
   return { creation: rowToPublic(created) }

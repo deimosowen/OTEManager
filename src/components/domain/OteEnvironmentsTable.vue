@@ -50,7 +50,7 @@
                 </button>
               </div>
             </td>
-            <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ formatDateRu(row.updatedAt) }}</td>
+            <td class="px-4 py-3 font-mono text-xs text-slate-500">{{ formatDate(row.updatedAt) }}</td>
             <td class="px-4 py-3" @click.stop>
               <div class="flex items-center gap-2">
                 <AppButton
@@ -82,7 +82,9 @@
 <script setup>
 import { ChevronRight, Server, Play, Square } from 'lucide-vue-next'
 import { h } from 'vue'
-import { formatDateRu } from '~/utils/date'
+import { useUserTimeFormat } from '~/composables/useUserTimeFormat'
+
+const { formatDate } = useUserTimeFormat()
 
 defineProps({
   rows: { type: Array, default: () => [] },

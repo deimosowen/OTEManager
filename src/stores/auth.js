@@ -19,6 +19,10 @@ export const useAuthStore = defineStore('auth', {
     setUser(user) {
       this.user = user
     },
+    patchUser(patch) {
+      if (!this.user || !patch || typeof patch !== 'object') return
+      this.user = { ...this.user, ...patch }
+    },
     /** Редирект на серверный маршрут OAuth Яндекса */
     startYandexLogin(returnPath = '/') {
       const safe = safeReturnPath(returnPath)

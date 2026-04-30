@@ -7,6 +7,7 @@
       <span class="text-base font-extrabold text-brand">OTE Manager</span>
     </NuxtLink>
     <div class="flex-1" />
+    <AppNotificationsBell />
     <NuxtLink
       to="/profile"
       class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-slate-800 transition hover:bg-brand-light"
@@ -26,24 +27,12 @@
       <span class="max-w-[140px] truncate">{{ auth.displayName }}</span>
       <ChevronDown class="size-3.5 text-slate-500" />
     </NuxtLink>
-    <button
-      type="button"
-      class="flex size-8 flex-col items-center justify-center gap-1 rounded-md hover:bg-slate-100"
-      aria-label="Меню"
-      @click="toast.show('Меню: скоро', 'info')"
-    >
-      <span class="block h-0.5 w-[18px] rounded bg-slate-400" />
-      <span class="block h-0.5 w-[18px] rounded bg-slate-400" />
-      <span class="block h-0.5 w-[18px] rounded bg-slate-400" />
-    </button>
   </header>
 </template>
 
 <script setup>
 import { ChevronDown } from 'lucide-vue-next'
 import { useAuthStore } from '~/stores/auth'
-import { useToast } from '~/composables/useToast'
 
 const auth = useAuthStore()
-const toast = useToast()
 </script>

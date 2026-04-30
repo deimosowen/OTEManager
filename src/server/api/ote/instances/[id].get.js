@@ -16,7 +16,9 @@ import {
   mapGroupToListRow,
   resolveListGroupKey,
 } from '../../../utils/yc/compute.js'
+import { findBlockingOteTcCreationForMetadataTag } from '../../../utils/ote-tc-creation-guard.js'
 import { resolveTcPendingState } from '../../../utils/ote-tc-pending.js'
+import { pickMetadataTagFromMembers } from '../../../utils/teamcity/metadata-tag.js'
 import { buildMvpOptsFromRuntimeConfig } from '../../../utils/yc/mvp-from-config.js'
 
 /**
@@ -59,6 +61,19 @@ export default defineEventHandler(async (event) => {
     const item = enrichOteDetailItem(row, filtered, labelKey, mvp)
     const pend = await resolveTcPendingState(id, filtered, config)
     item.tcOperationPending = pend || null
+    const metaTagGrp = pickMetadataTagFromMembers(filtered, labelKey)
+    try {
+      const hitGrp = metaTagGrp ? await findBlockingOteTcCreationForMetadataTag(getDb(), metaTagGrp) : null
+      item.oteTcCreationBlocking = hitGrp
+        ? {
+            id: hitGrp.id,
+            teamcityBuildId: hitGrp.teamcityBuildId,
+            teamcityWebUrl: hitGrp.teamcityWebUrl,
+          }
+        : null
+    } catch {
+      item.oteTcCreationBlocking = null
+    }
     const tag = String(item.oteName || groupKey || '').trim()
     if (tag) {
       try {
@@ -94,6 +109,19 @@ export default defineEventHandler(async (event) => {
   const item = enrichOteDetailItem(base, [inst], labelKey, mvp, { login: user.login || '', email: user.email || '' })
   const pend = await resolveTcPendingState(id, [inst], config)
   item.tcOperationPending = pend || null
+  const metaTagVm = pickMetadataTagFromMembers([inst], labelKey)
+  try {
+    const hitVm = metaTagVm ? await findBlockingOteTcCreationForMetadataTag(getDb(), metaTagVm) : null
+    item.oteTcCreationBlocking = hitVm
+      ? {
+          id: hitVm.id,
+          teamcityBuildId: hitVm.teamcityBuildId,
+          teamcityWebUrl: hitVm.teamcityWebUrl,
+        }
+      : null
+  } catch {
+    item.oteTcCreationBlocking = null
+  }
   const tag = String(item.oteName || labels[labelKey] || '').trim()
   if (tag) {
     try {

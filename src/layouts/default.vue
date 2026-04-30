@@ -3,7 +3,7 @@
     <AppTopbar />
     <div class="flex">
       <AppSidebar />
-      <main class="flex-1 overflow-y-auto px-8 py-7">
+      <main class="min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-8 py-7">
         <slot />
       </main>
     </div>

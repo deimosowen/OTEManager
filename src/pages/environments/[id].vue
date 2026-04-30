@@ -62,6 +62,22 @@
           </button>
         </div>
 
+        <div
+          v-if="isYc && env.oteTcCreationBlocking"
+          class="mt-3 flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2.5 text-sm font-semibold text-sky-950"
+        >
+          <div class="flex items-start gap-2">
+            <Loader2 class="mt-0.5 size-4 shrink-0 animate-spin text-sky-600" aria-hidden="true" />
+            <span>{{ oteCreationBlockingCardText }}</span>
+          </div>
+          <NuxtLink
+            :to="`/create/requests/${env.oteTcCreationBlocking.id}`"
+            class="self-start text-xs font-bold text-brand underline decoration-brand/30 underline-offset-2"
+          >
+            Открыть запрос создания · логи TeamCity
+          </NuxtLink>
+        </div>
+
         <div v-if="isYc" class="mt-3 flex flex-wrap items-center gap-3 text-sm">
           <div v-if="env.runBy" class="flex items-center gap-2 font-semibold text-slate-800">
             <UserRound class="size-5 shrink-0 text-slate-400" aria-hidden="true" />
@@ -149,7 +165,11 @@
           <AppButton
             variant="danger"
             size="md"
-            :disabled="env.status === OTE_STATUS.DELETING || Boolean(env.tcOperationPending)"
+            :disabled="
+              env.status === OTE_STATUS.DELETING ||
+              Boolean(env.tcOperationPending) ||
+              Boolean(env.oteTcCreationBlocking)
+            "
             @click="deleteModalOpen = true"
           >
             <Trash2 class="size-3.5" />
@@ -202,7 +222,7 @@
         </div>
         <div v-if="oteTcCreationSummary.createdAt">
           <dt class="font-bold text-slate-700">Создан запрос</dt>
-          <dd class="mt-0.5 font-mono text-xs text-slate-600">{{ formatTcCreationUtc(oteTcCreationSummary.createdAt) }}</dd>
+          <dd class="mt-0.5 font-mono text-xs text-slate-600">{{ formatDateTimeSeconds(oteTcCreationSummary.createdAt) }}</dd>
         </div>
         <div v-if="oteTcCreationSummary.actorLogin || oteTcCreationSummary.actorEmail">
           <dt class="font-bold text-slate-700">Инициатор</dt>
@@ -474,7 +494,7 @@
         <div class="divide-y divide-slate-200">
           <div v-for="(h, idx) in env.history" :key="idx" class="flex gap-3 py-2">
             <div class="w-[92px] shrink-0 font-mono text-xs font-semibold text-slate-500">
-              {{ formatDateRu(h.at) }}
+              {{ formatDate(h.at) }}
             </div>
             <div class="text-sm font-semibold text-slate-800">{{ h.text }}</div>
           </div>
@@ -488,8 +508,10 @@
         <AppButton variant="secondary" size="sm" class="!text-xs" :loading="oteAuditLoading" @click="loadOteAudit">Обновить</AppButton>
       </div>
       <p class="mb-3 text-xs font-semibold text-slate-500">
-        UTC. В выборку входят события по id карточки и по метке OTE (metadata.tag), в т.ч. создание через TeamCity.
-        Поиск — по логину, почте и метке.
+        Время в таблице — в вашем часовом поясе из
+        <NuxtLink to="/profile" class="text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand">профиля</NuxtLink>
+        ({{ timeZone }}). Фильтры «С»/«По» задают календарные сутки в UTC. В выборку входят события по id карточки и по метке OTE
+        (metadata.tag), в т.ч. создание через TeamCity. Поиск — по логину, почте и метке.
       </p>
       <div class="mb-4 flex flex-wrap items-end gap-2">
         <div class="min-w-[140px] flex-1 sm:max-w-[200px]">
@@ -532,7 +554,7 @@
         <table class="w-full min-w-[640px] border-collapse text-sm">
           <thead>
             <tr class="border-b border-slate-100 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-              <th class="px-3 py-2.5">Время (UTC)</th>
+              <th class="px-3 py-2.5">Время</th>
               <th class="px-3 py-2.5">Действие</th>
               <th class="px-3 py-2.5">Логин</th>
               <th class="px-3 py-2.5">Почта</th>
@@ -545,7 +567,7 @@
             </tr>
             <template v-else>
               <tr v-for="r in oteAuditRows" :key="r.id" class="border-b border-slate-50 last:border-b-0">
-                <td class="whitespace-nowrap px-3 py-2 font-mono text-xs text-slate-800">{{ formatOteAuditUtc(r.occurredAt) }}</td>
+                <td class="whitespace-nowrap px-3 py-2 font-mono text-xs text-slate-800">{{ formatDateTimeSeconds(r.occurredAt) }}</td>
                 <td class="px-3 py-2 font-semibold text-slate-900">{{ auditActionLabel(r.actionCode) }}</td>
                 <td class="px-3 py-2 text-slate-700">{{ r.actorLogin || '—' }}</td>
                 <td class="max-w-[180px] truncate px-3 py-2 text-xs text-slate-700" :title="r.actorEmail">{{ r.actorEmail || '—' }}</td>
@@ -608,7 +630,9 @@ import { AUDIT_ACTION_FILTER_OPTIONS, AUDIT_LIST_PAGE_SIZE, AUDIT_SEARCH_DEBOUNC
 import { $fetch } from 'ofetch'
 import { useEnvironmentsStore } from '~/stores/environments'
 import { OTE_STATUS, OTE_STATUS_LABELS } from '~/constants/ote'
-import { formatDateRu } from '~/utils/date'
+import { useUserTimeFormat } from '~/composables/useUserTimeFormat'
+
+const { formatDate, formatDateTimeSeconds, timeZone } = useUserTimeFormat()
 import { oteTcCreationStatusClass, oteTcCreationStatusLabel } from '~/utils/ote-tc-creation-status.js'
 
 const route = useRoute()
@@ -681,10 +705,17 @@ const headlineStatus = computed(() => {
 const ycCanRefresh = computed(() => Boolean(isYc.value))
 
 /** Те же правила, что в таблице списка (`OteMvpYcTable`). */
+const oteCreationBlockingCardText = computed(() => {
+  const b = env.value?.oteTcCreationBlocking
+  if (!b?.id) return ''
+  return `Для этой метки выполняется создание OTE (запрос #${b.id}). Старт, стоп и удаление недоступны, пока сборка в TeamCity не завершится успешно или с ошибкой.`
+})
+
 const cardCanStart = computed(() => {
   const e = env.value
   if (!e || e.source !== 'yc') return false
   if (e.tcOperationPending) return false
+  if (e.oteTcCreationBlocking) return false
   if (e.status === OTE_STATUS.DELETING) return false
   const t = e.instances?.total
   const r = e.instances?.ready
@@ -696,6 +727,7 @@ const cardCanStop = computed(() => {
   const e = env.value
   if (!e || e.source !== 'yc') return false
   if (e.tcOperationPending) return false
+  if (e.oteTcCreationBlocking) return false
   if (e.status === OTE_STATUS.DELETING) return false
   const t = e.instances?.total
   const r = e.instances?.ready
@@ -754,13 +786,6 @@ const oteTcCreationHasOutcomeLinks = computed(() => {
   return Boolean(s.caseoneUrl || s.saasAppUrl || s.rabbitUrl)
 })
 
-function formatTcCreationUtc(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
-  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' Z')
-}
-
 const labelSections = computed(() => {
   const e = env.value
   if (!e || !Array.isArray(e.ycLabelSections)) return []
@@ -781,7 +806,8 @@ function clearDetailPoll() {
 }
 
 watch(
-  () => Boolean(env.value?.tcOperationPending) && isYc.value,
+  () =>
+    Boolean(env.value?.tcOperationPending || env.value?.oteTcCreationBlocking) && isYc.value,
   (active) => {
     clearDetailPoll()
     if (!active) return
@@ -826,13 +852,6 @@ async function loadDetail() {
     /* данные из списка / мок */
   }
   void loadOteAudit()
-}
-
-function formatOteAuditUtc(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
-  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' Z')
 }
 
 async function loadOteAudit() {

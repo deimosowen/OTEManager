@@ -68,6 +68,18 @@
                   Снять ожидание
                 </button>
               </div>
+              <div
+                v-if="row.oteTcCreationBlocking"
+                class="mt-2 flex max-w-[260px] flex-col gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5 text-[11px] font-semibold leading-snug text-sky-950"
+              >
+                <span>{{ oteCreationBlockingHint(row.oteTcCreationBlocking) }}</span>
+                <NuxtLink
+                  :to="`/create/requests/${row.oteTcCreationBlocking.id}`"
+                  class="text-[10px] font-bold uppercase tracking-wide text-brand underline decoration-brand/30 underline-offset-2"
+                >
+                  Запрос создания · логи
+                </NuxtLink>
+              </div>
             </td>
             <td class="px-4 py-3 text-sm text-slate-700">
               <span class="font-mono text-xs">{{ row.versionBackend || '—' }}</span>
@@ -102,7 +114,7 @@
                   Стоп
                 </AppButton>
                 <AppButton
-                  v-if="row.status !== OTE_STATUS.DELETING && !row.tcOperationPending"
+                  v-if="row.status !== OTE_STATUS.DELETING && !row.tcOperationPending && !row.oteTcCreationBlocking"
                   size="sm"
                   variant="danger"
                   class="!px-2 !py-1 !text-[11px]"
@@ -213,8 +225,14 @@ function go(id) {
 /**
  * Старт (TeamCity): есть хотя бы одна остановленная ВМ в группе.
  */
+function oteCreationBlockingHint(b) {
+  if (!b?.id) return ''
+  return `Создание OTE ещё идёт (запрос #${b.id}). Действия с ВМ заблокированы до завершения сборки TeamCity.`
+}
+
 function rowCanStart(row) {
   if (row.tcOperationPending) return false
+  if (row.oteTcCreationBlocking) return false
   if (row.status === OTE_STATUS.DELETING) return false
   const t = row.instances?.total
   const r = row.instances?.ready
@@ -227,6 +245,7 @@ function rowCanStart(row) {
  */
 function rowCanStop(row) {
   if (row.tcOperationPending) return false
+  if (row.oteTcCreationBlocking) return false
   if (row.status === OTE_STATUS.DELETING) return false
   const t = row.instances?.total
   const r = row.instances?.ready
@@ -300,7 +319,7 @@ async function runTeamCity(row, action) {
 
 function runDelete(row) {
   const id = row.id
-  if (!id || row.status === OTE_STATUS.DELETING || row.tcOperationPending) return
+  if (!id || row.status === OTE_STATUS.DELETING || row.tcOperationPending || row.oteTcCreationBlocking) return
   pendingDeleteRow.value = row
   deleteModalOpen.value = true
 }

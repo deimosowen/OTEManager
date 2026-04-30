@@ -1,23 +1,16 @@
+/**
+ * Только обратная совместимость: без профиля считаем отображение в UTC.
+ * Новый код — `useUserTimeFormat()` или импорт из `~/utils/user-datetime-format`.
+ */
+import { DEFAULT_USER_TIMEZONE } from '~/constants/user-timezone'
+import { formatUserDate, formatUserDateTime } from './user-datetime-format'
+
+/** @deprecated `useUserTimeFormat().formatDate` */
 export function formatDateRu(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  })
+  return formatUserDate(iso, DEFAULT_USER_TIMEZONE)
 }
 
+/** @deprecated `useUserTimeFormat().formatDateTime` */
 export function formatDateTimeRu(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return formatUserDateTime(iso, DEFAULT_USER_TIMEZONE)
 }
