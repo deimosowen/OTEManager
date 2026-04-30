@@ -48,7 +48,7 @@
         <table class="min-w-[920px] w-full border-collapse text-sm">
           <thead>
             <tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-              <th class="px-4 py-3">Время (UTC)</th>
+              <th class="px-4 py-3">Время</th>
               <th class="px-4 py-3">Действие</th>
               <th class="px-4 py-3">Логин</th>
               <th class="px-4 py-3">Почта</th>
@@ -66,7 +66,7 @@
               </tr>
               <template v-else>
                 <tr v-for="r in rows" :key="r.id" class="border-b border-slate-100 last:border-b-0">
-                  <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-slate-800">{{ formatUtc(r.occurredAt) }}</td>
+                  <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-slate-800">{{ formatDateTimeSeconds(r.occurredAt) }}</td>
                   <td class="px-4 py-2.5 font-semibold text-slate-900">{{ labelFor(r.actionCode) }}</td>
                   <td class="px-4 py-2.5 text-slate-700">{{ r.actorLogin || '—' }}</td>
                   <td class="max-w-[220px] truncate px-4 py-2.5 text-slate-700" :title="r.actorEmail">{{ r.actorEmail || '—' }}</td>
@@ -100,7 +100,7 @@
         </div>
       </div>
       <p v-if="syncedAt" class="border-t border-slate-100 px-4 py-2 text-xs font-semibold text-slate-400">
-        Обновлено: {{ syncedAt }}
+        Обновлено: {{ formatDateTimeMedium(syncedAt) }}
       </p>
     </div>
   </div>
@@ -108,6 +108,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { useUserTimeFormat } from '~/composables/useUserTimeFormat'
 import { useAuditListSearch } from '~/composables/useAuditListSearch'
 import { AUDIT_ACTION_FILTER_OPTIONS, AUDIT_LIST_PAGE_SIZE, AUDIT_SEARCH_DEBOUNCE_MS, auditActionLabel } from '~/constants/audit'
 
@@ -121,6 +122,8 @@ const page = ref(1)
 const filterAction = ref('')
 const filterDateFrom = ref('')
 const filterDateTo = ref('')
+
+const { formatDateTimeSeconds, formatDateTimeMedium, timeZone } = useUserTimeFormat()
 
 const debounceSec = computed(() => Math.round(AUDIT_SEARCH_DEBOUNCE_MS / 1000))
 
@@ -139,13 +142,6 @@ function resourceHref(oteResourceId) {
   const tc = /^tc-creation:(\d+)$/.exec(s)
   if (tc) return `/create/requests/${tc[1]}`
   return `/environments/${encodeURIComponent(s)}`
-}
-
-function formatUtc(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
-  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' Z')
 }
 
 function queryPayload() {

@@ -139,8 +139,8 @@
           <p class="mt-1.5 text-xs font-semibold text-slate-500">При сохранении выполняется проверка синтаксиса YAML.</p>
         </div>
         <div v-if="!isNew && meta.createdAt" class="mt-6 border-t border-slate-100 pt-4 text-xs font-semibold text-slate-500">
-          <p>Создан: {{ formatUtc(meta.createdAt) }} · {{ meta.createdByLogin || '—' }}</p>
-          <p class="mt-1">Изменён: {{ formatUtc(meta.updatedAt) }} · {{ meta.updatedByLogin || '—' }}</p>
+          <p>Создан: {{ formatDateTimeSeconds(meta.createdAt) }} · {{ meta.createdByLogin || '—' }}</p>
+          <p class="mt-1">Изменён: {{ formatDateTimeSeconds(meta.updatedAt) }} · {{ meta.updatedByLogin || '—' }}</p>
         </div>
         <div class="mt-8 flex flex-wrap gap-3">
           <AppButton :loading="saving" @click="save">{{ isNew ? 'Создать' : 'Сохранить' }}</AppButton>
@@ -161,10 +161,12 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useUserTimeFormat } from '~/composables/useUserTimeFormat'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const { formatDateTimeSeconds } = useUserTimeFormat()
 
 const idParam = computed(() => String(route.params.id || ''))
 const isNew = computed(() => idParam.value === 'new')
@@ -190,13 +192,6 @@ const meta = reactive({
   createdByLogin: '',
   updatedByLogin: '',
 })
-
-function formatUtc(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
-  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' Z')
-}
 
 function applyTemplate(t) {
   form.name = t.name || ''

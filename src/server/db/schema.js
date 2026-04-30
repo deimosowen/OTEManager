@@ -1,4 +1,4 @@
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { index, integer, primaryKey, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
 
 /**
  * Служебные ключи приложения (версия схемы, флаги и т.д.).
@@ -101,6 +101,33 @@ export const oteBuildTemplates = sqliteTable(
     updatedAtIdx: index('ote_build_templates_updated_at_idx').on(t.updatedAt),
   }),
 )
+
+/** In-app уведомления пользователя (ключ как в `integrationUserKey`). */
+export const userNotifications = sqliteTable(
+  'user_notifications',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    readAt: integer('read_at', { mode: 'timestamp_ms' }),
+    userKey: text('user_key', { length: 256 }).notNull(),
+    kind: text('kind', { length: 64 }).notNull(),
+    title: text('title', { length: 512 }).notNull(),
+    body: text('body', { length: 2048 }),
+    href: text('href', { length: 1024 }).notNull(),
+    tcCreationId: integer('tc_creation_id').notNull(),
+  },
+  (t) => ({
+    userTcKindUq: unique('user_notifications_user_tc_kind_uq').on(t.userKey, t.tcCreationId, t.kind),
+    userCreatedIdx: index('user_notifications_user_created_idx').on(t.userKey, t.createdAt),
+  }),
+)
+
+/** Персональные настройки UI (ключ совпадает с `integrationUserKey`: логин, иначе email, иначе id). */
+export const userSettings = sqliteTable('user_settings', {
+  userLogin: text('user_login', { length: 256 }).primaryKey(),
+  timezone: text('timezone', { length: 128 }).notNull().default('UTC'),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }),
+})
 
 export const userIntegrationCredentials = sqliteTable(
   'user_integration_credentials',

@@ -41,7 +41,7 @@
               <th class="px-4 py-3">Название</th>
               <th class="px-4 py-3">TeamCity</th>
               <th class="px-4 py-3">Доступ</th>
-              <th class="px-4 py-3">Изменён (UTC)</th>
+              <th class="px-4 py-3">Изменён</th>
               <th class="px-4 py-3">Автор изменения</th>
             </tr>
           </thead>
@@ -93,7 +93,7 @@
                   Общий
                 </span>
               </td>
-              <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-slate-800">{{ formatUtc(r.updatedAt) }}</td>
+              <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-slate-800">{{ formatDateTimeSeconds(r.updatedAt) }}</td>
               <td class="max-w-[240px] truncate px-4 py-2.5 text-slate-700" :title="r.updatedByEmail || ''">
                 {{ r.updatedByLogin || '—' }}
               </td>
@@ -108,8 +108,10 @@
 <script setup>
 import { Lock, Users } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
+import { useUserTimeFormat } from '~/composables/useUserTimeFormat'
 
 const router = useRouter()
+const { formatDateTimeSeconds } = useUserTimeFormat()
 
 const rows = ref([])
 const loading = ref(true)
@@ -121,13 +123,6 @@ const personalFilterOptions = [
   { value: 'no', label: 'Только общие' },
   { value: 'yes', label: 'Только личные' },
 ]
-
-function formatUtc(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
-  return d.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, ' Z')
-}
 
 function goNew() {
   void router.push('/templates/new')

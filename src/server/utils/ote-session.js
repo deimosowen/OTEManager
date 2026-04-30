@@ -48,6 +48,7 @@ export function readOteSession(event) {
 
 /**
  * Публичный объект пользователя для API и event.context (см. /api/auth/session).
+ * Поле `timezone` (IANA) подставляется в middleware и `/api/auth/session` из таблицы `user_settings`.
  * @param {Record<string, unknown> | null} session
  */
 export function mapOteSessionToPublicUser(session) {

@@ -1,5 +1,7 @@
 import { AUDIT_ACTION } from '@app-constants/audit.js'
+import { getDb } from '../../../../db/client.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../../utils/audit-log.js'
+import { assertMetadataTagNotBlockedByOteCreation } from '../../../../utils/ote-tc-creation-guard.js'
 import { peekTcPending } from '../../../../utils/ote-tc-pending.js'
 import { requireOteUser } from '../../../../utils/require-ote-auth.js'
 import { COMMAND_TYPES } from '../../../../utils/command-queue/command-types.js'
@@ -48,6 +50,11 @@ export default defineEventHandler(async (event) => {
     })
   }
 
+  const labelKey =
+    runtimeConfigString(config.ycInstanceLabelKey, 'NUXT_YC_INSTANCE_LABEL_KEY') || 'metadata-tag'
+  const metadataTag = pickMetadataTagFromMembers(members, labelKey)
+  await assertMetadataTagNotBlockedByOteCreation(getDb(), metadataTag)
+
   const jobResult = await getCommandQueue().dispatch(
     COMMAND_TYPES.OTE_INSTANCE_POWER,
     {
@@ -58,9 +65,7 @@ export default defineEventHandler(async (event) => {
     { path: event.path },
   )
 
-  const labelKey =
-    runtimeConfigString(config.ycInstanceLabelKey, 'NUXT_YC_INSTANCE_LABEL_KEY') || 'metadata-tag'
-  const oteTag = pickMetadataTagFromMembers(members, labelKey) || null
+  const oteTag = metadataTag || null
   const auditAction = action === 'start' ? AUDIT_ACTION.OTE_POWER_START : AUDIT_ACTION.OTE_POWER_STOP
   await recordAuditEvent(
     auditPayloadFromUser(user, {

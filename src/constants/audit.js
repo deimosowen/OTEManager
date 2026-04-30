@@ -11,6 +11,7 @@ export const AUDIT_SEARCH_DEBOUNCE_MS = 2500
 export const AUDIT_ACTION = {
   LOGIN: 'login',
   OTE_CREATE: 'ote_create',
+  /** Старт создания OTE в TeamCity в журнале пишется после выхода сборки из очереди TC, когда с агента получен metadata.tag. */
   OTE_CREATE_TC_QUEUE: 'ote_create_tc_queue',
   OTE_CREATE_TC_SUCCEEDED: 'ote_create_tc_succeeded',
   OTE_CREATE_TC_FAILED: 'ote_create_tc_failed',

@@ -1,5 +1,13 @@
 <template>
   <div class="space-y-10 pb-8">
+    <OteDeleteConfirmModal
+      v-model="deleteModalOpen"
+      :ote-label="pendingDeleteLabel"
+      :variant="deleteModalVariant"
+      :confirm-loading="deleteConfirmLoading"
+      @confirm="onDeleteModalConfirm"
+    />
+
     <!-- Hero -->
     <section
       class="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-br from-brand via-brand-mid to-sky-500 px-6 py-8 text-white shadow-card-md sm:px-10 sm:py-10"
@@ -80,31 +88,120 @@
 
         <ul v-else class="relative mt-6 space-y-3">
           <li v-for="row in myOteRows" :key="row.id">
-            <NuxtLink
-              :to="`/environments/${encodeURIComponent(row.id)}`"
-              class="group flex items-center gap-4 rounded-2xl border border-slate-100 bg-gradient-to-r from-slate-50/90 to-white px-4 py-3.5 transition hover:border-brand/25 hover:shadow-md"
+            <div
+              class="overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-r from-slate-50/90 to-white transition hover:border-brand/25 hover:shadow-md"
             >
-              <span
-                class="size-2.5 shrink-0 rounded-full"
-                :class="
-                  row.status === 'running'
-                    ? 'bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]'
-                    : row.status === 'deleting'
-                      ? 'bg-amber-500'
-                      : 'bg-slate-400'
-                "
-                aria-hidden="true"
-              />
-              <div class="min-w-0 flex-1">
-                <p class="truncate font-extrabold text-slate-900">{{ displayOteName(row) }}</p>
-                <p class="mt-0.5 truncate text-xs font-medium text-slate-500">
-                  <span v-if="row.oteName && row.oteName !== row.name" class="font-mono">{{ row.oteName }}</span>
-                  <span v-if="row.versionBackend" class="text-slate-400"> · {{ row.versionBackend }}</span>
-                  <span v-if="row.runBy" class="text-slate-400"> · {{ row.runBy }}</span>
-                </p>
+              <div class="flex items-stretch gap-0">
+              <NuxtLink
+                :to="`/environments/${encodeURIComponent(row.id)}`"
+                class="group flex min-w-0 flex-1 items-center gap-3 px-4 py-3.5 sm:gap-4"
+              >
+                <span
+                  class="size-2.5 shrink-0 rounded-full"
+                  :class="
+                    row.status === 'running'
+                      ? 'bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.25)]'
+                      : row.status === 'deleting'
+                        ? 'bg-amber-500'
+                        : 'bg-slate-400'
+                  "
+                  aria-hidden="true"
+                />
+                <div class="min-w-0 flex-1">
+                  <p class="truncate font-extrabold text-slate-900">{{ displayOteName(row) }}</p>
+                  <p class="mt-0.5 truncate text-xs font-medium text-slate-500">
+                    <span v-if="row.oteName && row.oteName !== row.name" class="font-mono">{{ row.oteName }}</span>
+                    <span v-if="row.versionBackend" class="text-slate-400"> · {{ row.versionBackend }}</span>
+                    <span v-if="row.runBy" class="text-slate-400"> · {{ row.runBy }}</span>
+                  </p>
+                </div>
+                <ChevronRight
+                  class="size-5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-brand"
+                />
+              </NuxtLink>
+              <div
+                v-if="store.listSource === 'yc' || store.listSource === 'seed'"
+                class="flex shrink-0 flex-wrap items-center justify-end gap-1 border-l border-slate-100/90 bg-white/50 px-2 py-2 sm:gap-1.5 sm:px-3"
+                @click.stop
+              >
+                <template v-if="store.listSource === 'yc'">
+                  <AppButton
+                    v-if="rowCanStartYc(row)"
+                    size="sm"
+                    variant="primary"
+                    class="!px-2.5 !py-1 !text-[11px]"
+                    :loading="isRowBusy(row.id, 'tc-start')"
+                    @click="ycTeamCity(row, 'start')"
+                  >
+                    <Play class="size-3 shrink-0" />
+                    Старт
+                  </AppButton>
+                  <AppButton
+                    v-if="rowCanStopYc(row)"
+                    size="sm"
+                    variant="warn"
+                    class="!px-2.5 !py-1 !text-[11px]"
+                    :loading="isRowBusy(row.id, 'tc-stop')"
+                    @click="ycTeamCity(row, 'stop')"
+                  >
+                    <Square class="size-3 shrink-0" />
+                    Стоп
+                  </AppButton>
+                  <AppButton
+                    v-if="row.status !== OTE_STATUS.DELETING && !row.tcOperationPending && !row.oteTcCreationBlocking"
+                    size="sm"
+                    variant="danger"
+                    class="!px-2 !py-1 !text-[11px]"
+                    :loading="isRowBusy(row.id, 'delete')"
+                    @click="openYcDelete(row)"
+                  >
+                    <Trash2 class="size-3 shrink-0" />
+                  </AppButton>
+                </template>
+                <template v-else-if="store.listSource === 'seed'">
+                  <AppButton
+                    v-if="row.status !== OTE_STATUS.DELETING"
+                    size="sm"
+                    :variant="row.status === OTE_STATUS.RUNNING ? 'primary' : 'secondary'"
+                    class="!px-2.5 !py-1 !text-[11px]"
+                    @click="seedTogglePower(row)"
+                  >
+                    {{ row.status === OTE_STATUS.RUNNING ? 'Стоп' : 'Старт' }}
+                  </AppButton>
+                  <AppButton
+                    v-if="row.status !== OTE_STATUS.DELETING"
+                    size="sm"
+                    variant="danger"
+                    class="!px-2 !py-1 !text-[11px]"
+                    @click="openSeedDelete(row)"
+                  >
+                    <Trash2 class="size-3 shrink-0" />
+                  </AppButton>
+                  <AppButton
+                    v-if="row.status === OTE_STATUS.DELETING"
+                    size="sm"
+                    variant="danger"
+                    class="!px-2.5 !py-1 !text-[11px]"
+                    @click="openSeedDelete(row)"
+                  >
+                    Удалить
+                  </AppButton>
+                </template>
               </div>
-              <ChevronRight class="size-5 shrink-0 text-slate-300 transition group-hover:text-brand group-hover:translate-x-0.5" />
-            </NuxtLink>
+              </div>
+              <div
+                v-if="store.listSource === 'yc' && row.oteTcCreationBlocking"
+                class="border-t border-sky-100 bg-sky-50 px-4 py-2 text-[11px] font-semibold leading-snug text-sky-950"
+              >
+                Идёт создание OTE (запрос #{{ row.oteTcCreationBlocking.id }}). Старт, стоп и удаление недоступны.
+                <NuxtLink
+                  :to="`/create/requests/${row.oteTcCreationBlocking.id}`"
+                  class="ml-1 font-bold text-brand underline decoration-brand/30 underline-offset-2"
+                >
+                  Логи TeamCity
+                </NuxtLink>
+              </div>
+            </div>
           </li>
         </ul>
       </section>
@@ -177,20 +274,27 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
   ChevronRight,
   CirclePlus,
   LayoutGrid,
   Layers,
+  Play,
   Server,
   Sparkles,
+  Square,
+  Trash2,
   Zap,
 } from 'lucide-vue-next'
+import { $fetch } from 'ofetch'
+import { notifyOteInstancesRefresh, subscribeOteInstancesRefresh } from '~/composables/useOteInstancesBroadcast'
+import { OTE_STATUS } from '~/constants/ote'
 import { useEnvironmentsStore } from '~/stores/environments'
 import { oteTcCreationStatusLabel } from '~/utils/ote-tc-creation-status.js'
 
 const store = useEnvironmentsStore()
+const toast = useToast()
 
 function creationStatusPillClass(s) {
   if (s === 'queued') return 'bg-amber-100 text-amber-950'
@@ -210,6 +314,168 @@ const myOteRows = computed(() => {
 function displayOteName(row) {
   return String(row.name || row.oteName || `OTE ${row.id}`).trim() || `OTE ${row.id}`
 }
+
+/** @type {Record<string, boolean>} */
+const rowBusy = reactive({})
+
+function busyKey(id, op) {
+  return `${id}::${op}`
+}
+
+function isRowBusy(rowId, op) {
+  return Boolean(rowBusy[busyKey(rowId, op)])
+}
+
+function setRowBusy(rowId, op, v) {
+  rowBusy[busyKey(rowId, op)] = v
+}
+
+function rowCanStartYc(row) {
+  if (row.tcOperationPending) return false
+  if (row.oteTcCreationBlocking) return false
+  if (row.status === OTE_STATUS.DELETING) return false
+  const t = row.instances?.total
+  const r = row.instances?.ready
+  if (typeof t !== 'number' || t < 1) return false
+  return typeof r === 'number' && r < t
+}
+
+function rowCanStopYc(row) {
+  if (row.tcOperationPending) return false
+  if (row.oteTcCreationBlocking) return false
+  if (row.status === OTE_STATUS.DELETING) return false
+  const t = row.instances?.total
+  const r = row.instances?.ready
+  return typeof t === 'number' && t > 0 && typeof r === 'number' && r === t
+}
+
+async function ycTeamCity(row, action) {
+  const id = row.id
+  if (!id) return
+  const op = action === 'start' ? 'tc-start' : 'tc-stop'
+  setRowBusy(id, op, true)
+  try {
+    const res = await $fetch(`/api/ote/instances/${encodeURIComponent(id)}/teamcity`, {
+      method: 'POST',
+      body: { action },
+      credentials: 'include',
+    })
+    const buildId = res?.teamCity?.buildId
+    toast.show(`Сборка TeamCity поставлена в очередь${buildId ? ` (#${buildId})` : ''}.`, 'success')
+    try {
+      await store.refreshFromYandexApi()
+    } catch {
+      /* ignore */
+    }
+    notifyOteInstancesRefresh()
+  } catch (e) {
+    const code = e?.statusCode ?? e?.response?.status
+    if (code === 409) {
+      toast.show(e?.data?.message || 'Операция TeamCity для этой OTE уже выполняется.', 'warn')
+    } else {
+      toast.show(e?.data?.message || e?.message || String(e), 'error')
+    }
+  } finally {
+    setRowBusy(id, op, false)
+  }
+}
+
+const deleteModalOpen = ref(false)
+const deleteModalVariant = ref(/** @type {'yc' | 'seed'} */ ('yc'))
+const pendingYcDeleteRow = ref(/** @type {any} */ (null))
+const pendingSeedDelete = ref({ id: '', label: '' })
+
+const pendingDeleteLabel = computed(() => {
+  if (deleteModalVariant.value === 'seed') return pendingSeedDelete.value.label
+  const row = pendingYcDeleteRow.value
+  return row ? String(row.oteName || row.name || row.id || '') : ''
+})
+
+const deleteConfirmLoading = computed(() => {
+  if (!deleteModalOpen.value) return false
+  if (deleteModalVariant.value === 'yc') {
+    const id = pendingYcDeleteRow.value?.id
+    return id ? isRowBusy(id, 'delete') : false
+  }
+  return false
+})
+
+function openYcDelete(row) {
+  if (!row?.id || row.status === OTE_STATUS.DELETING || row.tcOperationPending || row.oteTcCreationBlocking) return
+  pendingYcDeleteRow.value = row
+  pendingSeedDelete.value = { id: '', label: '' }
+  deleteModalVariant.value = 'yc'
+  deleteModalOpen.value = true
+}
+
+function openSeedDelete(row) {
+  if (!row?.id) return
+  pendingYcDeleteRow.value = null
+  pendingSeedDelete.value = { id: String(row.id), label: displayOteName(row) }
+  deleteModalVariant.value = 'seed'
+  deleteModalOpen.value = true
+}
+
+async function onDeleteModalConfirm() {
+  if (deleteModalVariant.value === 'seed') {
+    const { id } = pendingSeedDelete.value
+    if (!id) {
+      deleteModalOpen.value = false
+      return
+    }
+    store.remove(id)
+    toast.show('Окружение удалено из списка', 'success')
+    deleteModalOpen.value = false
+    pendingSeedDelete.value = { id: '', label: '' }
+    return
+  }
+
+  const row = pendingYcDeleteRow.value
+  if (!row?.id) {
+    deleteModalOpen.value = false
+    return
+  }
+  const id = row.id
+  setRowBusy(id, 'delete', true)
+  try {
+    const res = await $fetch(`/api/ote/instances/${encodeURIComponent(id)}/teamcity`, {
+      method: 'POST',
+      body: { action: 'delete' },
+      credentials: 'include',
+    })
+    const buildId = res?.teamCity?.buildId
+    toast.show(`Сборка удаления в TeamCity поставлена в очередь${buildId ? ` (#${buildId})` : ''}.`, 'success')
+    deleteModalOpen.value = false
+    pendingYcDeleteRow.value = null
+    try {
+      await store.refreshFromYandexApi()
+    } catch {
+      /* ignore */
+    }
+    notifyOteInstancesRefresh()
+  } catch (e) {
+    const sc = e?.statusCode ?? e?.response?.status
+    toast.show(e?.data?.message || e?.message || String(e), sc === 409 ? 'warn' : 'error')
+  } finally {
+    setRowBusy(id, 'delete', false)
+  }
+}
+
+function seedTogglePower(row) {
+  if (!row || row.status === OTE_STATUS.DELETING) return
+  const running = row.status === OTE_STATUS.RUNNING
+  store.setRunning(row.id, !running)
+  toast.show(running ? `OTE «${displayOteName(row)}» остановлена` : `OTE «${displayOteName(row)}» запущена`, running ? 'warn' : 'success')
+}
+
+let unsubEnvBroadcast = () => {}
+
+watch(deleteModalOpen, (open) => {
+  if (!open) {
+    pendingYcDeleteRow.value = null
+    pendingSeedDelete.value = { id: '', label: '' }
+  }
+})
 
 async function loadActiveCreations() {
   try {
@@ -233,16 +499,18 @@ function startPoll() {
 }
 
 onMounted(async () => {
-  try {
-    await store.refreshFromYandexApi()
-  } catch {
-    /* ignore — store покажет seed при ошибке */
-  }
-  await loadActiveCreations()
+  unsubEnvBroadcast = subscribeOteInstancesRefresh(() => {
+    if (store.listSource === 'yc') void store.refreshFromYandexApi().catch(() => {})
+  })
+  await Promise.all([
+    store.refreshFromYandexApi().catch(() => {}),
+    loadActiveCreations(),
+  ])
   startPoll()
 })
 
 onBeforeUnmount(() => {
+  unsubEnvBroadcast()
   if (pollTimer.value != null) {
     clearInterval(pollTimer.value)
     pollTimer.value = null

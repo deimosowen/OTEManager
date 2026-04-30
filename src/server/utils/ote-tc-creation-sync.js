@@ -1,8 +1,9 @@
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { AUDIT_ACTION } from '@app-constants/audit.js'
 import { getDb } from '../db/client.js'
 import { oteTcCreations } from '../db/schema.js'
 import { auditPayloadFromUser, recordAuditEvent } from './audit-log.js'
+import { notifyOteTcCreationFinished } from './user-notifications.js'
 import { fetchTeamCityResultingPropertiesMap } from './teamcity/build-details.js'
 import { fetchTeamCityBuildSnapshot } from './teamcity/client.js'
 import { resolveTeamCityAuthorizationHeader } from './teamcity/resolve-auth.js'
@@ -21,6 +22,65 @@ function metadataTagFromRequest(row) {
   } catch {
     return null
   }
+}
+
+/**
+ * Сборка вышла из очереди TeamCity и может иметь actual/resulting parameters на агенте.
+ * Пока state пустой или `queued` — не читаем параметры с агента (ждём следующий опрос).
+ *
+ * @param {{ state?: string, terminal?: boolean } | null} snap
+ */
+function teamCityBuildHasLeftQueue(snap) {
+  if (!snap || snap.terminal) return false
+  const s = String(snap.state || '').toLowerCase().trim()
+  if (!s) return false
+  if (s === 'queued') return false
+  return true
+}
+
+/**
+ * Actual parameters on agent (resulting properties в REST TeamCity) — кладём `metadata.tag` в БД,
+ * только если сборка уже не в очереди TC (см. `teamCityBuildHasLeftQueue`).
+ * Пока в очереди или параметра нет — следующий опрос страницы повторит попытку.
+ *
+ * @param {{ login?: string, email?: string, id?: string }} user — кто опрашивает TC (`OTE_CREATE_TC_QUEUE` в аудит при первой записи tag с агента)
+ * @returns {Promise<string | null>} метка после записи или из колонки / параметров запроса
+ */
+async function persistMetadataTagFromTcAgentIfEmpty(db, config, authorization, row, now, user) {
+  const existing = row.metadataTag && String(row.metadataTag).trim()
+  if (existing) return existing
+
+  const buildId = row.teamcityBuildId ? String(row.teamcityBuildId).trim() : ''
+  if (!buildId || !authorization) return metadataTagFromRequest(row)
+
+  const props = await fetchTeamCityResultingPropertiesMap({ config, buildId, authorization })
+  const t = props.map['metadata.tag'] != null ? String(props.map['metadata.tag']).trim() : ''
+  if (!t) return metadataTagFromRequest(row)
+
+  const inserted = await db
+    .update(oteTcCreations)
+    .set({ metadataTag: t, updatedAt: now })
+    .where(and(eq(oteTcCreations.id, row.id), isNull(oteTcCreations.metadataTag)))
+    .returning({ id: oteTcCreations.id })
+
+  if (inserted.length) {
+    await recordAuditEvent(
+      auditPayloadFromUser(user, {
+        actionCode: AUDIT_ACTION.OTE_CREATE_TC_QUEUE,
+        oteResourceId: `tc-creation:${row.id}`,
+        oteTag: t,
+        details: {
+          creationId: row.id,
+          buildTemplateId: row.buildTemplateId != null ? row.buildTemplateId : null,
+          buildTypeId: row.buildTypeId || null,
+          teamcityBuildId: buildId,
+          teamcityWebUrl: row.teamcityWebUrl || null,
+        },
+      }),
+    )
+  }
+
+  return t
 }
 
 /**
@@ -157,10 +217,9 @@ export async function syncOteTcCreationRow(config, user, row) {
     return rowToPublic(row)
   }
 
-  const tagHint = row.metadataTag || metadataTagFromRequest(row)
-
   const authorization = await resolveTeamCityAuthorizationHeader(config, { userKey: row.actorLogin })
   if (!authorization) {
+    const tagHint = row.metadataTag || metadataTagFromRequest(row)
     const [updated] = await db
       .update(oteTcCreations)
       .set({
@@ -184,12 +243,16 @@ export async function syncOteTcCreationRow(config, user, row) {
           },
         }),
       )
+      await notifyOteTcCreationFinished(updated, 'failed', updated.lastError || 'Нет авторизации TeamCity')
     }
     const [r] = await db.select().from(oteTcCreations).where(eq(oteTcCreations.id, row.id)).limit(1)
     return rowToPublic(r || row)
   }
 
   const snap = await fetchTeamCityBuildSnapshot({ config, buildId, authorization })
+
+  let tagHint = row.metadataTag || metadataTagFromRequest(row) || null
+
   if (!snap || snap.httpStatus === 404) {
     await db.update(oteTcCreations).set({ updatedAt: now, status: 'running' }).where(eq(oteTcCreations.id, row.id))
     const [r] = await db.select().from(oteTcCreations).where(eq(oteTcCreations.id, row.id)).limit(1)
@@ -197,6 +260,10 @@ export async function syncOteTcCreationRow(config, user, row) {
   }
 
   if (!snap.terminal) {
+    if (teamCityBuildHasLeftQueue(snap)) {
+      const persisted = await persistMetadataTagFromTcAgentIfEmpty(db, config, authorization, row, now, user)
+      if (persisted) tagHint = persisted
+    }
     await db.update(oteTcCreations).set({ updatedAt: now, status: 'running' }).where(eq(oteTcCreations.id, row.id))
     const [r] = await db.select().from(oteTcCreations).where(eq(oteTcCreations.id, row.id)).limit(1)
     return rowToPublic(r || row)
@@ -229,6 +296,7 @@ export async function syncOteTcCreationRow(config, user, row) {
           },
         }),
       )
+      await notifyOteTcCreationFinished(updated, 'failed', err)
     }
     const [r] = await db.select().from(oteTcCreations).where(eq(oteTcCreations.id, row.id)).limit(1)
     return rowToPublic(r || row)
@@ -262,6 +330,7 @@ export async function syncOteTcCreationRow(config, user, row) {
           },
         }),
       )
+      await notifyOteTcCreationFinished(updated, 'failed', err)
     }
     const [r] = await db.select().from(oteTcCreations).where(eq(oteTcCreations.id, row.id)).limit(1)
     return rowToPublic(r || row)
@@ -303,6 +372,7 @@ export async function syncOteTcCreationRow(config, user, row) {
         },
       }),
     )
+    await notifyOteTcCreationFinished(updated, 'succeeded')
   }
 
   const [r] = await db.select().from(oteTcCreations).where(eq(oteTcCreations.id, row.id)).limit(1)

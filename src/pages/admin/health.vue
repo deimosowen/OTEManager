@@ -47,7 +47,7 @@
           </div>
           <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
             <p class="text-[11px] font-bold uppercase tracking-wide text-slate-400">Проверка</p>
-            <p class="mt-1 font-mono text-sm font-semibold text-white">{{ formatChecked(meta.checkedAt) }}</p>
+            <p class="mt-1 font-mono text-sm font-semibold text-white">{{ formatDateTimeMedium(meta.checkedAt) }}</p>
           </div>
           <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
             <p class="text-[11px] font-bold uppercase tracking-wide text-slate-400">Длительность</p>
@@ -129,6 +129,9 @@
 import { Activity, AlertTriangle, CheckCircle2, HelpCircle, RefreshCw, XCircle } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { $fetch } from 'ofetch'
+import { useUserTimeFormat } from '~/composables/useUserTimeFormat'
+
+const { formatDateTimeMedium } = useUserTimeFormat()
 
 const loading = ref(true)
 const error = ref('')
@@ -177,13 +180,6 @@ function statusRu(s) {
   if (s === 'ok') return 'Норма'
   if (s === 'warn') return 'Внимание'
   return 'Ошибка'
-}
-
-function formatChecked(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return String(iso)
-  return d.toLocaleString('ru-RU', { dateStyle: 'medium', timeStyle: 'medium' })
 }
 
 function formatUptime(sec) {

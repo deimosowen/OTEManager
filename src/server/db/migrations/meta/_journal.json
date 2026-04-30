@@ -85,6 +85,20 @@
       "when": 1777600000000,
       "tag": "0011_ote_user_build_template_shortcuts",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777700000000,
+      "tag": "0012_user_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1777800000000,
+      "tag": "0013_user_notifications",
+      "breakpoints": true
     }
   ]
 }
