@@ -1,6 +1,6 @@
 import { getDb } from '../../db/client.js'
 import { requireOteUser } from '../../utils/require-ote-auth.js'
-import { findBlockingOteTcCreationForMetadataTag } from '../../utils/ote-tc-creation-guard.js'
+import { getActiveOteTcCreationBlockingByMetadataTagMap } from '../../utils/ote-tc-creation-guard.js'
 import { pickMetadataTagFromMembers } from '../../utils/teamcity/metadata-tag.js'
 import { runtimeConfigString } from '../../utils/yc/config-helpers.js'
 import { createYandexCloudSession } from '../../utils/yc/session.js'
@@ -12,7 +12,7 @@ import {
 } from '../../utils/yc/compute.js'
 import { resolveTcPendingState } from '../../utils/ote-tc-pending.js'
 import { buildMvpOptsFromRuntimeConfig } from '../../utils/yc/mvp-from-config.js'
-import { listMemberInstancesForOteId } from '../../utils/yc/ote-members.js'
+import { listMemberInstancesForOteIdFromFolderInstances } from '../../utils/yc/ote-members.js'
 
 /**
  * Список OTE из Yandex Compute: ВМ в каталоге с меткой (по умолчанию `metadata-tag`).
@@ -49,25 +49,28 @@ export default defineEventHandler(async (event) => {
     actor: { login: user.login || '', email: user.email || '' },
   })
   const db = getDb()
-  /** Один общий список ВМ; без этого на каждую OTE уходило бы повторное listAllInstancesInFolder (очень медленно). */
+  /** Один SQL вместо N: активные ote_tc_creations по всем metadata.tag. */
+  let blockingByTag = new Map()
+  try {
+    blockingByTag = await getActiveOteTcCreationBlockingByMetadataTagMap(db)
+  } catch {
+    blockingByTag = new Map()
+  }
+  const membersByItem = items.map((item) => listMemberInstancesForOteIdFromFolderInstances(all, item.id, config))
   await Promise.all(
-    items.map(async (item) => {
-      const members = await listMemberInstancesForOteId(session, folderId, item.id, config, all)
+    items.map(async (item, i) => {
+      const members = membersByItem[i] || []
       const pend = await resolveTcPendingState(item.id, members, config)
       item.tcOperationPending = pend || null
       const metaTag = pickMetadataTagFromMembers(members, labelKey)
-      try {
-        const hit = metaTag ? await findBlockingOteTcCreationForMetadataTag(db, metaTag) : null
-        item.oteTcCreationBlocking = hit
-          ? {
-              id: hit.id,
-              teamcityBuildId: hit.teamcityBuildId,
-              teamcityWebUrl: hit.teamcityWebUrl,
-            }
-          : null
-      } catch {
-        item.oteTcCreationBlocking = null
-      }
+      const hit = metaTag ? blockingByTag.get(metaTag) : undefined
+      item.oteTcCreationBlocking = hit
+        ? {
+            id: hit.id,
+            teamcityBuildId: hit.teamcityBuildId,
+            teamcityWebUrl: hit.teamcityWebUrl,
+          }
+        : null
     }),
   )
   const filtered = all.filter((i) => instanceMatchesLabelFilter(i, labelKey, labelValue))

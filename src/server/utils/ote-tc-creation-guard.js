@@ -5,6 +5,56 @@ import { oteTcCreations } from '../db/schema.js'
 const ACTIVE_CREATION_STATUSES = /** @type {const} */ (['queued', 'running'])
 
 /**
+ * Одним запросом: активные создания OTE → карта metadata.tag → запись (самая новая по createdAt на тег).
+ * Используется в списке инстансов вместо N отдельных запросов на каждую строку.
+ *
+ * @param {import('drizzle-orm').LibSQLDatabase} db
+ * @returns {Promise<Map<string, { id: number, teamcityBuildId: string | null, teamcityWebUrl: string | null }>>}
+ */
+export async function getActiveOteTcCreationBlockingByMetadataTagMap(db) {
+  const rows = await db
+    .select({
+      id: oteTcCreations.id,
+      createdAt: oteTcCreations.createdAt,
+      metadataTag: oteTcCreations.metadataTag,
+      requestPropertiesJson: oteTcCreations.requestPropertiesJson,
+      teamcityBuildId: oteTcCreations.teamcityBuildId,
+      teamcityWebUrl: oteTcCreations.teamcityWebUrl,
+    })
+    .from(oteTcCreations)
+    .where(inArray(oteTcCreations.status, ACTIVE_CREATION_STATUSES))
+    .orderBy(desc(oteTcCreations.createdAt))
+
+  /** @type {Map<string, { id: number, teamcityBuildId: string | null, teamcityWebUrl: string | null }>} */
+  const byTag = new Map()
+  for (const row of rows) {
+    /** @type {Set<string>} */
+    const tags = new Set()
+    const col = row.metadataTag ? String(row.metadataTag).trim() : ''
+    if (col) tags.add(col)
+    try {
+      const raw = row.requestPropertiesJson
+      const j = raw ? JSON.parse(raw) : null
+      if (j && typeof j === 'object' && j['metadata.tag'] != null) {
+        const mt = String(j['metadata.tag']).trim()
+        if (mt) tags.add(mt)
+      }
+    } catch {
+      /* ignore bad JSON */
+    }
+    const payload = {
+      id: row.id,
+      teamcityBuildId: row.teamcityBuildId,
+      teamcityWebUrl: row.teamcityWebUrl,
+    }
+    for (const t of tags) {
+      if (!byTag.has(t)) byTag.set(t, payload)
+    }
+  }
+  return byTag
+}
+
+/**
  * Активное создание OTE по совпадению metadata.tag:
  * - колонка `metadata_tag` (после появления в Actual parameters на агенте TeamCity),
  * - или параметр `metadata.tag` из JSON запроса сборки (до появления на агенте).

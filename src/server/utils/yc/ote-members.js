@@ -2,6 +2,32 @@ import { runtimeConfigString } from './config-helpers.js'
 import { instanceMatchesLabelFilter, listAllInstancesInFolder, resolveListGroupKey } from './compute.js'
 
 /**
+ * Все ВМ, входящие в эту OTE — синхронно из уже загруженного списка каталога (без запросов в YC).
+ *
+ * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[]} folderInstances
+ * @param {string} id id ВМ или `grp:…`
+ * @param {import('@nuxt/schema').NitroRuntimeConfig} config
+ */
+export function listMemberInstancesForOteIdFromFolderInstances(folderInstances, id, config) {
+  const labelKey =
+    runtimeConfigString(config.ycInstanceLabelKey, 'NUXT_YC_INSTANCE_LABEL_KEY') || 'metadata-tag'
+  const labelValue = runtimeConfigString(config.ycInstanceLabelValue, 'NUXT_YC_INSTANCE_LABEL_VALUE')
+  const gb = runtimeConfigString(config.ycGroupByLabelKey, 'NUXT_YC_GROUP_BY_LABEL_KEY') || 'metadata-tag'
+  const all = Array.isArray(folderInstances) ? folderInstances : []
+  if (id.startsWith('grp:')) {
+    const groupKey = decodeURIComponent(id.slice(4))
+    return all.filter((inst) => {
+      if (!instanceMatchesLabelFilter(inst, labelKey, labelValue)) return false
+      const gval = resolveListGroupKey(inst, labelKey, gb)
+      return gval === groupKey
+    })
+  }
+  const inst = all.find((i) => i.id === id)
+  if (!inst || !instanceMatchesLabelFilter(inst, labelKey, labelValue)) return []
+  return [inst]
+}
+
+/**
  * Все ВМ, входящие в эту OTE (одна ВМ по id или группа по `grp:` + метка группировки).
  *
  * Если передать `preloadedInstances` — не вызывает `listAllInstancesInFolder` повторно
@@ -14,23 +40,9 @@ import { instanceMatchesLabelFilter, listAllInstancesInFolder, resolveListGroupK
  * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[] | undefined} [preloadedInstances]
  */
 export async function listMemberInstancesForOteId(session, folderId, id, config, preloadedInstances = undefined) {
-  const labelKey =
-    runtimeConfigString(config.ycInstanceLabelKey, 'NUXT_YC_INSTANCE_LABEL_KEY') || 'metadata-tag'
-  const labelValue = runtimeConfigString(config.ycInstanceLabelValue, 'NUXT_YC_INSTANCE_LABEL_VALUE')
-  const gb = runtimeConfigString(config.ycGroupByLabelKey, 'NUXT_YC_GROUP_BY_LABEL_KEY') || 'metadata-tag'
   const all =
     Array.isArray(preloadedInstances)
       ? preloadedInstances
       : await listAllInstancesInFolder(session, folderId)
-  if (id.startsWith('grp:')) {
-    const groupKey = decodeURIComponent(id.slice(4))
-    return all.filter((inst) => {
-      if (!instanceMatchesLabelFilter(inst, labelKey, labelValue)) return false
-      const gval = resolveListGroupKey(inst, labelKey, gb)
-      return gval === groupKey
-    })
-  }
-  const inst = all.find((i) => i.id === id)
-  if (!inst || !instanceMatchesLabelFilter(inst, labelKey, labelValue)) return []
-  return [inst]
+  return listMemberInstancesForOteIdFromFolderInstances(all, id, config)
 }
