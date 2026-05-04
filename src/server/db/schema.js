@@ -129,6 +129,100 @@ export const userSettings = sqliteTable('user_settings', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }),
 })
 
+/** Роли приложения (код — стабильный идентификатор для проверок в коде). */
+export const appRoles = sqliteTable(
+  'app_roles',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    code: text('code', { length: 64 }).notNull(),
+    label: text('label', { length: 128 }).notNull(),
+    description: text('description'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (t) => ({
+    codeUq: unique('app_roles_code_uq').on(t.code),
+  }),
+)
+
+/** Группы каталога пользователей (системная «Общая» + произвольные). */
+export const oteAppGroups = sqliteTable(
+  'ote_app_groups',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    code: text('code', { length: 64 }).notNull(),
+    name: text('name', { length: 256 }).notNull(),
+    isSystem: integer('is_system').notNull().default(0),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (t) => ({
+    codeUq: unique('ote_app_groups_code_uq').on(t.code),
+  }),
+)
+
+/** TeamCity: URL и buildTypeId для операций — настройки по группе. */
+export const oteGroupTeamcitySettings = sqliteTable('ote_group_teamcity_settings', {
+  groupId: integer('group_id')
+    .primaryKey()
+    .references(() => oteAppGroups.id, { onDelete: 'cascade' }),
+  tcRestBaseUrl: text('tc_rest_base_url', { length: 2048 }).notNull(),
+  tcUiBaseUrl: text('tc_ui_base_url', { length: 2048 }).notNull(),
+  startBuildTypeId: text('start_build_type_id', { length: 512 }).notNull(),
+  stopBuildTypeId: text('stop_build_type_id', { length: 512 }).notNull(),
+  deleteBuildTypeId: text('delete_build_type_id', { length: 512 }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedByUserKey: text('updated_by_user_key', { length: 256 }),
+})
+
+/** Yandex Cloud: каталог с виртуальными машинами группы (как TeamCity — по группе каталога). */
+export const oteGroupYcSettings = sqliteTable('ote_group_yc_settings', {
+  groupId: integer('group_id')
+    .primaryKey()
+    .references(() => oteAppGroups.id, { onDelete: 'cascade' }),
+  ycFolderId: text('yc_folder_id', { length: 128 }).notNull().default(''),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedByUserKey: text('updated_by_user_key', { length: 256 }),
+})
+
+/** Известные пользователи (OAuth); синхронизация при входе. */
+export const oteDirectoryUsers = sqliteTable(
+  'ote_directory_users',
+  {
+    userKey: text('user_key', { length: 256 }).primaryKey(),
+    email: text('email', { length: 512 }).notNull(),
+    login: text('login', { length: 256 }).notNull().default(''),
+    displayName: text('display_name', { length: 512 }).notNull().default(''),
+    groupId: integer('group_id')
+      .notNull()
+      .references(() => oteAppGroups.id, { onDelete: 'restrict' }),
+    firstSeenAt: integer('first_seen_at', { mode: 'timestamp_ms' }).notNull(),
+    lastSeenAt: integer('last_seen_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (t) => ({
+    emailIdx: index('ote_directory_users_email_idx').on(t.email),
+    lastSeenIdx: index('ote_directory_users_last_seen_idx').on(t.lastSeenAt),
+    groupIdIdx: index('ote_directory_users_group_id_idx').on(t.groupId),
+  }),
+)
+
+/** Назначенные роли пользователю. */
+export const oteUserRoleAssignments = sqliteTable(
+  'ote_user_role_assignments',
+  {
+    userKey: text('user_key', { length: 256 }).notNull(),
+    roleId: integer('role_id')
+      .notNull()
+      .references(() => appRoles.id, { onDelete: 'cascade' }),
+    assignedAt: integer('assigned_at', { mode: 'timestamp_ms' }).notNull(),
+    assignedByUserKey: text('assigned_by_user_key', { length: 256 }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userKey, t.roleId] }),
+    roleIdx: index('ote_user_role_assignments_role_idx').on(t.roleId),
+  }),
+)
+
 export const userIntegrationCredentials = sqliteTable(
   'user_integration_credentials',
   {

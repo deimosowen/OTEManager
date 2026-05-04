@@ -1,5 +1,3 @@
-import { teamCityRestBaseUrl } from './config.js'
-
 /** Максимум символов лога в ответе API (хвост лога при обрезке). */
 const DEFAULT_MAX_LOG_CHARS = 900_000
 
@@ -8,7 +6,7 @@ const DEFAULT_MAX_LOG_CHARS = 900_000
  * При превышении лимита возвращается хвост лога.
  *
  * @param {{
- *   config: import('@nuxt/schema').NitroRuntimeConfig,
+ *   baseUrl: string,
  *   buildId: string,
  *   authorization: string,
  *   maxChars?: number,
@@ -16,7 +14,7 @@ const DEFAULT_MAX_LOG_CHARS = 900_000
  * @returns {Promise<{ text: string, truncated: boolean, httpStatus: number, error: string | null }>}
  */
 export async function fetchTeamCityBuildLogPlain(opts) {
-  const { config, buildId, authorization, maxChars = DEFAULT_MAX_LOG_CHARS } = opts
+  const { buildId, authorization, baseUrl, maxChars = DEFAULT_MAX_LOG_CHARS } = opts
   const id = String(buildId || '').trim()
   if (!id) {
     return { text: '', truncated: false, httpStatus: 0, error: 'no_build_id' }
@@ -25,10 +23,15 @@ export async function fetchTeamCityBuildLogPlain(opts) {
     return { text: '', truncated: false, httpStatus: 0, error: 'no_auth' }
   }
 
-  const baseUrl = teamCityRestBaseUrl(config).replace(/\/+$/, '')
+  const b = String(baseUrl || '')
+    .trim()
+    .replace(/\/+$/, '')
+  if (!b) {
+    return { text: '', truncated: false, httpStatus: 0, error: 'no_base_url' }
+  }
   /** Обход прокси/браузерного кэша GET: лог должен быть актуальным при каждом опросе */
   const nocache = `plain=true&_=${Date.now()}`
-  const url = `${baseUrl}/downloadBuildLog.html?buildId=${encodeURIComponent(id)}&${nocache}`
+  const url = `${b}/downloadBuildLog.html?buildId=${encodeURIComponent(id)}&${nocache}`
 
   const res = await fetch(url, {
     method: 'GET',

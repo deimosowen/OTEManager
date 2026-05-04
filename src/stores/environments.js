@@ -61,8 +61,11 @@ function mergeOteClientRow(prev, incoming) {
 export const useEnvironmentsStore = defineStore('environments', {
   state: () => ({
     /**
-     * `pending` — первая загрузка списка (пустой список, без демо-строк);
-     * `yc` — из Compute; `seed` — демо после ошибки или вручную.
+     * `pending` — первая загрузка;
+     * `yc` — список из облака (каталог задан);
+     * `no_folder` — для группы не указан каталог, список пустой;
+     * `error` — сбой загрузки;
+     * `seed` — только для тестов / явного вызова `useSeedList()`.
      */
     listSource: 'pending',
     /** Таблица в стиле TeamCity из `/api/ote/instances` (только при `listSource === 'yc'`). */
@@ -144,6 +147,15 @@ export const useEnvironmentsStore = defineStore('environments', {
       this.lastListError = ''
       try {
         const res = await $fetch('/api/ote/instances', { credentials: 'include' })
+        if (res && res.ycFolderConfigured === false) {
+          this.items = []
+          this.tcTable = null
+          this.listSource = 'no_folder'
+          const hint = typeof res.listHint === 'string' ? res.listHint.trim() : ''
+          this.lastListError =
+            hint || 'Каталог облака для вашей группы не настроен. Обратитесь к администратору.'
+          return
+        }
         if (Array.isArray(res.items)) {
           const prevItems = this.items
           this.items = res.items.map((row) => {
@@ -153,12 +165,16 @@ export const useEnvironmentsStore = defineStore('environments', {
           this.listSource = 'yc'
           this.tcTable = res.tcTable && typeof res.tcTable === 'object' ? res.tcTable : null
         } else {
-          this.useSeedList()
-          this.lastListError = 'Ответ API без массива items'
+          this.items = []
+          this.tcTable = null
+          this.listSource = 'error'
+          this.lastListError = 'Ответ сервера без списка окружений'
         }
       } catch (e) {
         const msg = e?.data?.message || e?.message || String(e)
-        this.useSeedList()
+        this.items = []
+        this.tcTable = null
+        this.listSource = 'error'
         this.lastListError = msg
         throw e
       }

@@ -162,10 +162,12 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useUserTimeFormat } from '~/composables/useUserTimeFormat'
+import { useAuthStore } from '~/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const auth = useAuthStore()
 const { formatDateTimeSeconds } = useUserTimeFormat()
 
 const idParam = computed(() => String(route.params.id || ''))
@@ -212,8 +214,11 @@ function applyTemplate(t) {
 const computedTeamcityBuildUrl = computed(() => {
   const id = String(form.teamcityBuildTypeId || '').trim()
   if (!id) return ''
-  // URL сохраняется на сервере автоматически; тут — удобный кликабельный вид
-  return `https://ci.pravo.tech/buildConfiguration/${encodeURIComponent(id)}`
+  const base = String(auth.user?.group?.tcUiBaseUrl || auth.user?.group?.tcRestBaseUrl || '')
+    .trim()
+    .replace(/\/+$/, '')
+  if (!base) return ''
+  return `${base}/buildConfiguration/${encodeURIComponent(id)}`
 })
 
 async function loadOne() {

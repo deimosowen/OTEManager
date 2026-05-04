@@ -4,8 +4,11 @@ import { instanceService } from '@yandex-cloud/nodejs-sdk/compute-v1'
 import { getDb, resolveSqliteFilePath } from '../db/client.js'
 import { appMeta } from '../db/schema.js'
 import { resolveMigrationsDir } from '../db/resolve-migrations-dir.js'
+import { integrationUserKey } from './integrations/user-credentials.js'
+import { getDefaultGroupId } from './ote-app-groups.js'
+import { fetchTeamCityGroupSettingsByUserKey } from './teamcity/group-settings.js'
+import { fetchYcGroupSettingsByGroupId } from './yc/group-settings.js'
 import { isTeamCityAuthAvailable, resolveTeamCityAuthorizationHeader } from './teamcity/resolve-auth.js'
-import { teamCityRestBaseUrl } from './teamcity/config.js'
 import { createYandexCloudSession } from './yc/session.js'
 import { loadServiceAccountCredentials } from './yc/sa-credentials.js'
 import { runtimeConfigString } from './yc/config-helpers.js'
@@ -70,7 +73,7 @@ async function ycListProbe(session, folderId) {
 
 /**
  * @param {import('@nuxt/schema').NitroRuntimeConfig} config
- * @param {{ login?: string, email?: string, id?: string }} user — для TeamCity только персональный токен из профиля (не серверный NUXT_TC_*).
+ * @param {{ login?: string, email?: string, id?: string }} user — для TeamCity: персональный токен и URL из настроек группы в БД.
  */
 export async function collectHealthPayload(config, user) {
   const started = Date.now()
@@ -109,7 +112,19 @@ export async function collectHealthPayload(config, user) {
     )
   }
 
-  const folderId = runtimeConfigString(config.ycFolderId, 'NUXT_YC_FOLDER_ID')
+  let folderId = ''
+  if (database.ok) {
+    try {
+      const dbProbe = getDb()
+      const defId = await getDefaultGroupId(dbProbe)
+      if (defId) {
+        const ycRow = await fetchYcGroupSettingsByGroupId(dbProbe, defId)
+        folderId = String(ycRow?.ycFolderId || '').trim()
+      }
+    } catch {
+      folderId = ''
+    }
+  }
   let ycCredOk = false
   let ycCredMsg = ''
   try {
@@ -124,7 +139,9 @@ export async function collectHealthPayload(config, user) {
     checks.push(
       check('warn', 'Yandex Compute', {
         id: 'yc',
-        detail: ycCredOk ? 'Ключ настроен, но не задан NUXT_YC_FOLDER_ID' : ycCredMsg || 'Не настроено',
+        detail: ycCredOk
+          ? 'Ключ настроен, но для системной группы не задан каталог YC в настройках'
+          : ycCredMsg || 'Не настроено',
       }),
     )
   } else if (!ycCredOk) {
@@ -165,7 +182,16 @@ export async function collectHealthPayload(config, user) {
     }
   }
 
-  const tcBase = teamCityRestBaseUrl(config)
+  let tcBase = ''
+  try {
+    const db = getDb()
+    const ukey = integrationUserKey(user)
+    const g = ukey ? await fetchTeamCityGroupSettingsByUserKey(db, ukey) : null
+    tcBase = g?.tcRestBaseUrl ? String(g.tcRestBaseUrl).trim().replace(/\/+$/, '') : ''
+  } catch {
+    tcBase = ''
+  }
+
   let tcAuth = false
   try {
     tcAuth = await isTeamCityAuthAvailable(config, { user })
@@ -173,11 +199,18 @@ export async function collectHealthPayload(config, user) {
     tcAuth = false
   }
 
-  if (!tcAuth) {
+  if (!tcBase) {
     checks.push(
       check('warn', 'TeamCity', {
         id: 'teamcity',
-        detail: `Персональный токен в профиле не настроен — запрос к ${tcBase} не выполнялся. Серверные NUXT_TC_* здесь не используются.`,
+        detail: 'Для вашей группы не задан REST URL TeamCity в БД (настройки системы / группы).',
+      }),
+    )
+  } else if (!tcAuth) {
+    checks.push(
+      check('warn', 'TeamCity', {
+        id: 'teamcity',
+        detail: `Персональный токен в профиле не настроен — запрос к ${tcBase} не выполнялся.`,
       }),
     )
   } else {
@@ -190,43 +223,43 @@ export async function collectHealthPayload(config, user) {
         }),
       )
     } else {
-    const ac = new AbortController()
-    const timer = setTimeout(() => ac.abort(), 10000)
-    try {
-      const t0 = Date.now()
-      const res = await fetch(`${tcBase}/app/rest/version`, {
-        method: 'GET',
-        headers: { Authorization: auth, Accept: 'application/json,*/*' },
-        signal: ac.signal,
-      })
-      const ms = Date.now() - t0
-      const body = await res.text()
-      const snippet = body.length > 120 ? `${body.slice(0, 120)}…` : body
-      clearTimeout(timer)
-      if (!res.ok) {
+      const ac = new AbortController()
+      const timer = setTimeout(() => ac.abort(), 10000)
+      try {
+        const t0 = Date.now()
+        const res = await fetch(`${tcBase}/app/rest/version`, {
+          method: 'GET',
+          headers: { Authorization: auth, Accept: 'application/json,*/*' },
+          signal: ac.signal,
+        })
+        const ms = Date.now() - t0
+        const body = await res.text()
+        const snippet = body.length > 120 ? `${body.slice(0, 120)}…` : body
+        clearTimeout(timer)
+        if (!res.ok) {
+          checks.push(
+            check('error', 'TeamCity', {
+              id: 'teamcity',
+              detail: `HTTP ${res.status} за ${ms} ms (запрос с токеном из профиля) · ${snippet}`,
+            }),
+          )
+        } else {
+          checks.push(
+            check('ok', 'TeamCity', {
+              id: 'teamcity',
+              detail: `Ответ за ${ms} ms · ${tcBase} · токен из профиля · ${snippet.replace(/\s+/g, ' ').trim()}`,
+            }),
+          )
+        }
+      } catch (e) {
+        clearTimeout(timer)
         checks.push(
           check('error', 'TeamCity', {
             id: 'teamcity',
-            detail: `HTTP ${res.status} за ${ms} ms (запрос с токеном из профиля) · ${snippet}`,
-          }),
-        )
-      } else {
-        checks.push(
-          check('ok', 'TeamCity', {
-            id: 'teamcity',
-            detail: `Ответ за ${ms} ms · ${tcBase} · токен из профиля · ${snippet.replace(/\s+/g, ' ').trim()}`,
+            detail: e?.name === 'AbortError' ? 'Таймаут запроса к TeamCity' : e?.message || String(e),
           }),
         )
       }
-    } catch (e) {
-      clearTimeout(timer)
-      checks.push(
-        check('error', 'TeamCity', {
-          id: 'teamcity',
-          detail: e?.name === 'AbortError' ? 'Таймаут запроса к TeamCity' : e?.message || String(e),
-        }),
-      )
-    }
     }
   }
 

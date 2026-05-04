@@ -19,7 +19,7 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 503,
       message:
-        'TeamCity недоступен: добавьте персональный токен в профиле или настройте серверные переменные NUXT_TC_ACCESS_TOKEN / NUXT_TC_USERNAME и NUXT_TC_PASSWORD.',
+        'TeamCity недоступен: добавьте персональный токен в профиле (раздел «Интеграции»).',
     })
   }
 

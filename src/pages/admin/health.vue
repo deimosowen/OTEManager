@@ -140,12 +140,6 @@ const checks = ref([])
 const overall = ref('ok')
 const accessPolicy = ref('all_authenticated')
 
-const rt = useRuntimeConfig()
-const tcUi = computed(() => {
-  const u = rt.public?.teamcityUiBaseUrl
-  return typeof u === 'string' && u.trim() ? u.replace(/\/+$/, '') : ''
-})
-
 const overallLabel = computed(() => {
   if (overall.value === 'ok') return 'Все ключевые проверки пройдены'
   if (overall.value === 'warn') return 'Есть предупреждения'

@@ -1,5 +1,6 @@
 import { getDb } from '../../../db/client.js'
 import { requireOteUser } from '../../../utils/require-ote-auth.js'
+import { requireYcFolderIdForUser } from '../../../utils/yc/group-settings.js'
 import {
   fetchLatestOteTcCreationSummaryByMetadataTag,
   fetchLatestTcYamlForOteMetadataTag,
@@ -55,10 +56,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Не указан id' })
   }
   const config = useRuntimeConfig(event)
-  const folderId = runtimeConfigString(config.ycFolderId, 'NUXT_YC_FOLDER_ID')
-  if (!folderId) {
-    throw createError({ statusCode: 503, message: 'Не задан NUXT_YC_FOLDER_ID' })
-  }
+  const db = getDb()
+  const folderId = await requireYcFolderIdForUser(db, user)
   const session = createYandexCloudSession(config)
   if (!session) {
     throw createError({ statusCode: 503, message: 'Не настроен ключ сервисного аккаунта YC' })

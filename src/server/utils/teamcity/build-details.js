@@ -1,4 +1,11 @@
-import { teamCityAuthorizationHeader, teamCityRestBaseUrl } from './config.js'
+/**
+ * @param {unknown} u
+ */
+function normalizeBaseUrl(u) {
+  return String(u ?? '')
+    .trim()
+    .replace(/\/+$/, '')
+}
 
 /**
  * @param {Record<string, unknown> | null} j
@@ -47,24 +54,24 @@ export function parseResultingPropertiesMap(buildRoot) {
 /**
  * Снимок resulting parameters: GET сборки с `fields=…resultingProperties` и при необходимости
  * GET `/builds/id:…/resulting-properties` (в корне ответа — Properties).
- * @param {{ config: import('@nuxt/schema').NitroRuntimeConfig, buildId: string, authorization?: string }} opts
+ * @param {{ baseUrl: string, buildId: string, authorization: string }} opts
  * @returns {Promise<{ httpStatus: number, map: Record<string, string>, raw?: string }>}
  */
 export async function fetchTeamCityResultingPropertiesMap(opts) {
-  const { config, buildId, authorization: authorizationOverride } = opts
+  const { buildId, authorization, baseUrl } = opts
   const id = String(buildId || '').trim()
   if (!id) return { httpStatus: 400, map: {} }
-  const baseUrl = teamCityRestBaseUrl(config)
-  const authorization = authorizationOverride || teamCityAuthorizationHeader(config)
-  if (!authorization) return { httpStatus: 401, map: {} }
+  const b = normalizeBaseUrl(baseUrl)
+  const auth = String(authorization || '').trim()
+  if (!b || !auth) return { httpStatus: 401, map: {} }
 
   const headers = {
-    Authorization: authorization,
+    Authorization: auth,
     Accept: 'application/json',
   }
 
   /** Без `fields` TeamCity часто не возвращает resultingProperties в теле сборки. */
-  const buildUrl = `${baseUrl}/app/rest/builds/id:${encodeURIComponent(id)}?fields=id,resultingProperties(property(name,value))`
+  const buildUrl = `${b}/app/rest/builds/id:${encodeURIComponent(id)}?fields=id,resultingProperties(property(name,value))`
   const res1 = await fetch(buildUrl, { method: 'GET', headers })
   const text1 = await res1.text()
 
@@ -79,7 +86,7 @@ export async function fetchTeamCityResultingPropertiesMap(opts) {
     }
   }
 
-  const rpUrl = `${baseUrl}/app/rest/builds/id:${encodeURIComponent(id)}/resulting-properties`
+  const rpUrl = `${b}/app/rest/builds/id:${encodeURIComponent(id)}/resulting-properties`
   const res2 = await fetch(rpUrl, { method: 'GET', headers })
   const text2 = await res2.text()
 
@@ -109,21 +116,21 @@ export async function fetchTeamCityResultingPropertiesMap(opts) {
 
 /**
  * Полный JSON сборки (опционально с resultingProperties в `fields`).
- * @param {{ config: import('@nuxt/schema').NitroRuntimeConfig, buildId: string, authorization?: string }} opts
+ * @param {{ baseUrl: string, buildId: string, authorization: string }} opts
  * @returns {Promise<{ httpStatus: number, buildRoot: Record<string, unknown> | null, raw?: string }>}
  */
 export async function fetchTeamCityBuildJson(opts) {
-  const { config, buildId, authorization: authorizationOverride } = opts
+  const { buildId, authorization, baseUrl } = opts
   const id = String(buildId || '').trim()
   if (!id) return { httpStatus: 400, buildRoot: null }
-  const baseUrl = teamCityRestBaseUrl(config)
-  const authorization = authorizationOverride || teamCityAuthorizationHeader(config)
-  if (!authorization) return { httpStatus: 401, buildRoot: null }
-  const url = `${baseUrl}/app/rest/builds/id:${encodeURIComponent(id)}?fields=id,status,state,resultingProperties(property(name,value))`
+  const b = normalizeBaseUrl(baseUrl)
+  const auth = String(authorization || '').trim()
+  if (!b || !auth) return { httpStatus: 401, buildRoot: null }
+  const url = `${b}/app/rest/builds/id:${encodeURIComponent(id)}?fields=id,status,state,resultingProperties(property(name,value))`
   const res = await fetch(url, {
     method: 'GET',
     headers: {
-      Authorization: authorization,
+      Authorization: auth,
       Accept: 'application/json',
     },
   })

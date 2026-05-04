@@ -253,7 +253,6 @@ import { useAuthStore } from '~/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
-const rt = useRuntimeConfig()
 const toast = useToast()
 
 const navLinks = [
@@ -269,7 +268,8 @@ function scrollTo(sectionId) {
 }
 
 const tcUiBase = computed(() => {
-  const u = String(rt.public.teamcityUiBaseUrl || '').replace(/\/+$/, '')
+  const g = auth.user?.group
+  const u = String(g?.tcUiBaseUrl || g?.tcRestBaseUrl || '').replace(/\/+$/, '')
   return u || 'https://ci.pravo.tech'
 })
 

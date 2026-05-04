@@ -14,6 +14,7 @@ import {
 import { OTE_TC_PRESET_BUILD_TEMPLATE_UPDATE } from '../../../../utils/ote-tc-job-audit.js'
 import { isTeamCityAuthAvailable } from '../../../../utils/teamcity/resolve-auth.js'
 import { pickMetadataTagFromMembers } from '../../../../utils/teamcity/metadata-tag.js'
+import { requireYcFolderIdForUser } from '../../../../utils/yc/group-settings.js'
 import { runtimeConfigString } from '../../../../utils/yc/config-helpers.js'
 import { createYandexCloudSession } from '../../../../utils/yc/session.js'
 import { mapYcInstanceStatusToOte } from '../../../../utils/yc/compute.js'
@@ -38,7 +39,7 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 503,
       message:
-        'TeamCity недоступен: добавьте персональный токен в профиле или настройте серверные переменные NUXT_TC_ACCESS_TOKEN / NUXT_TC_USERNAME и NUXT_TC_PASSWORD.',
+        'TeamCity недоступен: добавьте персональный токен в профиле (раздел «Интеграции»).',
     })
   }
 
@@ -48,10 +49,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Укажите caseone.version' })
   }
 
-  const folderId = runtimeConfigString(config.ycFolderId, 'NUXT_YC_FOLDER_ID')
-  if (!folderId) {
-    throw createError({ statusCode: 503, message: 'Не задан NUXT_YC_FOLDER_ID' })
-  }
+  const db = getDb()
+  const folderId = await requireYcFolderIdForUser(db, user)
   const session = createYandexCloudSession(config)
   if (!session) {
     throw createError({ statusCode: 503, message: 'Не настроен ключ сервисного аккаунта YC' })
@@ -78,7 +77,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Не удалось определить metadata.tag для этой OTE' })
   }
 
-  const db = getDb()
   await assertMetadataTagNotBlockedByOteCreation(db, metadataTag)
 
   const userKey = integrationUserKey(user)

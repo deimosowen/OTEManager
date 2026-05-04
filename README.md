@@ -1,7 +1,5 @@
 # OTE Manager
 
-Репозиторий: [github.com/deimosowen/OTEManager](https://github.com/deimosowen/OTEManager)
-
 Веб-интерфейс для управления тестовыми окружениями **OTE**. Стек: **Nuxt 3**, **Vue 3**, **JavaScript** (без TypeScript в исходниках), **Tailwind CSS**, **Pinia**.
 
 ## Требования
@@ -19,7 +17,7 @@ npm run dev
 
 Откройте [http://localhost:3000](http://localhost:3000). Вход — **OAuth Яндекса** (настройки в `.env`, см. ниже).
 
-После входа доступны: список OTE из **Yandex Compute** (метки на ВМ), карточка окружения, **аудит**, **шаблоны деплоя** (YAML в БД), **создание OTE через TeamCity** (нужен токен TC в профиле или серверные `NUXT_TC_*`).
+После входа доступны: список OTE из **Yandex Compute** (метки на ВМ), карточка окружения, **аудит**, **шаблоны деплоя** (YAML в БД), **создание OTE через TeamCity** (персональный токен в профиле; URL и build type id для группы — в админке «Система»).
 
 ## Скрипты
 
@@ -121,8 +119,8 @@ SQLite хранится в именованном томе `**sqlite_data**` (п
 
 Кратко (полный список — в `**.env.example**`):
 
-- **YC**: `NUXT_YC_FOLDER_ID`, ключ сервисного аккаунта (`NUXT_YC_SA_KEY_PATH` или `NUXT_YC_SERVICE_ACCOUNT_JSON`), метки ВМ (`NUXT_YC_INSTANCE_LABEL_KEY` и др.).
-- **TeamCity**: серверный PAT / логин-пароль **или** персональный токен пользователя в профиле; `NUXT_TC_`* — URL и build type id при необходимости.
+- **YC**: каталог и облако задаются **по группе каталога** в админке («Настройки системы»); ключ сервисного аккаунта — `NUXT_YC_SA_KEY_PATH` или `NUXT_YC_SERVICE_ACCOUNT_JSON`; метки ВМ (`NUXT_YC_INSTANCE_LABEL_KEY` и др.).
+- **TeamCity**: только персональный токен в профиле; хост REST/UI и build type id для start/stop/delete — в БД по группе (редактирование: **Админка → Система**).
 - **«Мои окружения»** в списке: совпадение метки автора (`NUXT_YC_OTE_AUTHOR_LABEL`, по умолчанию `run-by`) с логином или почтой из сессии Яндекса.
 
 ## Git

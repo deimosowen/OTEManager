@@ -1,4 +1,6 @@
+import { getDb } from '../db/client.js'
 import { readOteSession, mapOteSessionToPublicUser } from '../utils/ote-session'
+import { attachRbacToPublicUser } from '../utils/rbac/bootstrap.js'
 import { attachTimezoneToPublicUser } from '../utils/user-settings.js'
 
 /**
@@ -15,7 +17,13 @@ export default defineEventHandler(async (event) => {
   try {
     const session = readOteSession(event)
     const base = mapOteSessionToPublicUser(session)
-    event.context.oteUser = base ? await attachTimezoneToPublicUser(base) : null
+    let user = base ? await attachTimezoneToPublicUser(base) : null
+    if (user) {
+      const db = getDb()
+      const config = useRuntimeConfig(event)
+      user = await attachRbacToPublicUser(db, config, user)
+    }
+    event.context.oteUser = user
   } catch {
     event.context.oteUser = null
   }

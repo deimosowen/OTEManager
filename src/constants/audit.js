@@ -1,3 +1,6 @@
+/** Префикс `ote_resource_id` для событий групп каталога (ссылка в UI → админка, вкладка «Группы»). */
+export const AUDIT_APP_GROUP_RESOURCE_PREFIX = 'app-group:'
+
 /** Размер страницы журнала аудита (фиксировано на сервере и в UI). */
 export const AUDIT_LIST_PAGE_SIZE = 20
 
@@ -29,6 +32,11 @@ export const AUDIT_ACTION = {
   OTE_BUILD_TEMPLATE_CREATE: 'ote_build_template_create',
   OTE_BUILD_TEMPLATE_UPDATE: 'ote_build_template_update',
   OTE_BUILD_TEMPLATE_DELETE: 'ote_build_template_delete',
+  USER_ROLES_UPDATE: 'user_roles_update',
+  USER_GROUP_UPDATE: 'user_group_update',
+  APP_GROUP_CREATE: 'app_group_create',
+  APP_GROUP_RENAME: 'app_group_rename',
+  APP_GROUP_DELETE: 'app_group_delete',
 }
 
 /** @type {Record<string, string>} */
@@ -52,6 +60,11 @@ export const AUDIT_ACTION_LABELS = {
   [AUDIT_ACTION.OTE_BUILD_TEMPLATE_CREATE]: 'Шаблон сборки: создание',
   [AUDIT_ACTION.OTE_BUILD_TEMPLATE_UPDATE]: 'Шаблон сборки: изменение',
   [AUDIT_ACTION.OTE_BUILD_TEMPLATE_DELETE]: 'Шаблон сборки: удаление',
+  [AUDIT_ACTION.USER_ROLES_UPDATE]: 'Пользователи: изменение ролей',
+  [AUDIT_ACTION.USER_GROUP_UPDATE]: 'Пользователи: смена группы',
+  [AUDIT_ACTION.APP_GROUP_CREATE]: 'Группы: создание',
+  [AUDIT_ACTION.APP_GROUP_RENAME]: 'Группы: переименование',
+  [AUDIT_ACTION.APP_GROUP_DELETE]: 'Группы: удаление',
 }
 
 /**

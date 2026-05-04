@@ -74,7 +74,11 @@
                     {{ r.oteTag || '—' }}
                   </td>
                   <td class="max-w-[200px] truncate px-4 py-2.5 font-mono text-xs text-slate-600" :title="r.oteResourceId || ''">
-                    <NuxtLink v-if="r.oteResourceId" :to="resourceHref(r.oteResourceId)" class="text-brand hover:underline">
+                    <NuxtLink
+                      v-if="r.oteResourceId"
+                      :to="resourceHref(r.oteResourceId, r.actionCode)"
+                      class="text-brand hover:underline"
+                    >
                       {{ r.oteResourceId }}
                     </NuxtLink>
                     <span v-else>—</span>
@@ -110,7 +114,18 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useUserTimeFormat } from '~/composables/useUserTimeFormat'
 import { useAuditListSearch } from '~/composables/useAuditListSearch'
-import { AUDIT_ACTION_FILTER_OPTIONS, AUDIT_LIST_PAGE_SIZE, AUDIT_SEARCH_DEBOUNCE_MS, auditActionLabel } from '~/constants/audit'
+import {
+  AUDIT_ACTION,
+  AUDIT_ACTION_FILTER_OPTIONS,
+  AUDIT_APP_GROUP_RESOURCE_PREFIX,
+  AUDIT_LIST_PAGE_SIZE,
+  AUDIT_SEARCH_DEBOUNCE_MS,
+  auditActionLabel,
+} from '~/constants/audit'
+
+definePageMeta({
+  middleware: ['admin-only'],
+})
 
 const rows = ref([])
 const loading = ref(true)
@@ -123,7 +138,7 @@ const filterAction = ref('')
 const filterDateFrom = ref('')
 const filterDateTo = ref('')
 
-const { formatDateTimeSeconds, formatDateTimeMedium, timeZone } = useUserTimeFormat()
+const { formatDateTimeSeconds, formatDateTimeMedium } = useUserTimeFormat()
 
 const debounceSec = computed(() => Math.round(AUDIT_SEARCH_DEBOUNCE_MS / 1000))
 
@@ -133,10 +148,23 @@ function labelFor(code) {
   return auditActionLabel(code)
 }
 
-/** Ссылка из колонки «Ресурс»: шаблоны, запрос создания OTE в TC, иначе карточка OTE */
-function resourceHref(oteResourceId) {
+const APP_GROUP_AUDIT_ACTIONS = new Set([
+  AUDIT_ACTION.APP_GROUP_CREATE,
+  AUDIT_ACTION.APP_GROUP_RENAME,
+  AUDIT_ACTION.APP_GROUP_DELETE,
+])
+
+/** Ссылка из колонки «Ресурс»: шаблоны, запрос создания OTE в TC, группы каталога, иначе карточка OTE */
+function resourceHref(oteResourceId, actionCode) {
   if (!oteResourceId) return '/'
   const s = String(oteResourceId)
+  const code = String(actionCode || '')
+  if (s.startsWith(AUDIT_APP_GROUP_RESOURCE_PREFIX)) {
+    return '/admin/users?tab=groups'
+  }
+  if (APP_GROUP_AUDIT_ACTIONS.has(code) && /^\d+$/.test(s)) {
+    return '/admin/users?tab=groups'
+  }
   const bt = /^build-template:(\d+)$/.exec(s)
   if (bt) return `/templates/${bt[1]}`
   const tc = /^tc-creation:(\d+)$/.exec(s)
