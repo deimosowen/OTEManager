@@ -19,7 +19,7 @@
     </div>
 
     <OteFiltersBar
-      v-if="store.listSource !== 'pending'"
+      v-if="store.listSource === 'yc' || store.listSource === 'seed'"
       :model-value="store.filters"
       :product-options="store.productOptions"
       :type-options="store.typeOptions"
@@ -37,6 +37,29 @@
         <div v-for="n in 8" :key="n" class="h-11 w-full animate-pulse rounded-lg bg-slate-100" />
       </div>
       <p class="mt-6 text-center text-sm font-semibold text-slate-500">Загружаем список из Yandex Cloud…</p>
+    </section>
+
+    <section
+      v-else-if="store.listSource === 'no_folder'"
+      class="rounded-2xl border border-amber-200 bg-amber-50/90 p-8 shadow-card"
+    >
+      <p class="text-sm font-semibold leading-relaxed text-amber-950">{{ store.lastListError }}</p>
+      <p class="mt-2 text-xs font-medium text-amber-900/85">
+        Когда администратор укажет каталог для вашей группы, список появится после обновления.
+      </p>
+      <AppButton type="button" variant="secondary" size="sm" class="mt-5 shadow-sm" @click="retryEnvironmentsLoad">
+        Обновить
+      </AppButton>
+    </section>
+
+    <section
+      v-else-if="store.listSource === 'error'"
+      class="rounded-2xl border border-rose-200 bg-rose-50/90 p-8 shadow-card"
+    >
+      <p class="text-sm font-semibold text-rose-900">{{ store.lastListError }}</p>
+      <AppButton type="button" variant="secondary" size="sm" class="mt-5 shadow-sm" @click="retryEnvironmentsLoad">
+        Повторить загрузку
+      </AppButton>
     </section>
 
     <template v-else-if="store.listSource === 'yc'">
@@ -93,6 +116,16 @@ watch(
   },
 )
 
+async function retryEnvironmentsLoad() {
+  try {
+    await store.refreshFromYandexApi()
+  } catch {
+    if (store.lastListError) {
+      toast.show(store.lastListError, 'error')
+    }
+  }
+}
+
 async function onDiscoverToggle(ev) {
   const el = ev.target
   if (!(el instanceof HTMLDetailsElement) || !el.open) return
@@ -137,13 +170,14 @@ let unsubBroadcast = () => {}
 
 function onListTabVisible() {
   if (typeof document === 'undefined') return
-  if (document.visibilityState !== 'visible' || store.listSource !== 'yc') return
+  if (document.visibilityState !== 'visible') return
+  if (store.listSource !== 'yc' && store.listSource !== 'no_folder') return
   void store.refreshFromYandexApi().catch(() => {})
 }
 
 onMounted(async () => {
   unsubBroadcast = subscribeOteInstancesRefresh(() => {
-    if (store.listSource === 'yc') void store.refreshFromYandexApi().catch(() => {})
+    if (store.listSource === 'yc' || store.listSource === 'no_folder') void store.refreshFromYandexApi().catch(() => {})
   })
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', onListTabVisible)
@@ -151,8 +185,8 @@ onMounted(async () => {
   try {
     await store.refreshFromYandexApi()
   } catch {
-    if (store.lastListError) {
-      toast.show(`Облако: ${store.lastListError}. Показаны демо-данные.`, 'warn')
+    if (store.listSource === 'error' && store.lastListError) {
+      toast.show(`Не удалось загрузить окружения: ${store.lastListError}`, 'error')
     }
   }
 })

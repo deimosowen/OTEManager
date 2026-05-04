@@ -6,8 +6,10 @@ import { markTcPending, peekTcPending } from '../../../../utils/ote-tc-pending.j
 import { requireOteUser } from '../../../../utils/require-ote-auth.js'
 import { integrationUserKey } from '../../../../utils/integrations/user-credentials.js'
 import { queueTeamCityBuild } from '../../../../utils/teamcity/client.js'
+import { fetchTeamCityGroupSettingsByUserKey } from '../../../../utils/teamcity/group-settings.js'
 import { isTeamCityAuthAvailable, resolveTeamCityAuthorizationHeader } from '../../../../utils/teamcity/resolve-auth.js'
 import { pickMetadataTagFromMembers } from '../../../../utils/teamcity/metadata-tag.js'
+import { requireYcFolderIdForUser } from '../../../../utils/yc/group-settings.js'
 import { runtimeConfigString } from '../../../../utils/yc/config-helpers.js'
 import { createYandexCloudSession } from '../../../../utils/yc/session.js'
 import { listMemberInstancesForOteId } from '../../../../utils/yc/ote-members.js'
@@ -32,15 +34,22 @@ export default defineEventHandler(async (event) => {
   if (!(await isTeamCityAuthAvailable(config, { user }))) {
     throw createError({
       statusCode: 503,
-      message:
-        'TeamCity недоступен: добавьте персональный токен в профиле (раздел «Интеграции») или настройте серверные переменные NUXT_TC_ACCESS_TOKEN (либо NUXT_TC_USERNAME и NUXT_TC_PASSWORD).',
+      message: 'TeamCity недоступен: добавьте персональный токен в профиле (раздел «Интеграции»).',
     })
   }
 
-  const folderId = runtimeConfigString(config.ycFolderId, 'NUXT_YC_FOLDER_ID')
-  if (!folderId) {
-    throw createError({ statusCode: 503, message: 'Не задан NUXT_YC_FOLDER_ID' })
+  const db = getDb()
+  const userKey = integrationUserKey(user)
+  const g = await fetchTeamCityGroupSettingsByUserKey(db, userKey)
+  if (!g?.tcRestBaseUrl) {
+    throw createError({
+      statusCode: 503,
+      message: 'Для вашей группы не задан URL REST TeamCity. Администратор может настроить это в разделе «Система».',
+    })
   }
+  const tcBase = g.tcRestBaseUrl
+
+  const folderId = await requireYcFolderIdForUser(db, user)
   const session = createYandexCloudSession(config)
   if (!session) {
     throw createError({ statusCode: 503, message: 'Не настроен ключ сервисного аккаунта YC' })
@@ -71,17 +80,17 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await assertMetadataTagNotBlockedByOteCreation(getDb(), metadataTag)
+  await assertMetadataTagNotBlockedByOteCreation(db, metadataTag)
 
   const buildTypeId =
     action === 'start'
-      ? runtimeConfigString(config.tcStartBuildTypeId, 'NUXT_TC_START_BUILD_TYPE_ID') ||
-        'CasePro_UniversalDeploy_StartByTag'
+      ? g.startBuildTypeId
       : action === 'stop'
-        ? runtimeConfigString(config.tcStopBuildTypeId, 'NUXT_TC_STOP_BUILD_TYPE_ID') ||
-          'CasePro_UniversalDeploy_StopByTag'
-        : runtimeConfigString(config.tcDeleteBuildTypeId, 'NUXT_TC_DELETE_BUILD_TYPE_ID') ||
-          'CasePro_UniversalDeploy_Delete'
+        ? g.stopBuildTypeId
+        : g.deleteBuildTypeId
+  if (!buildTypeId) {
+    throw createError({ statusCode: 503, message: 'Для вашей группы не задан buildTypeId для этой операции в настройках.' })
+  }
 
   try {
     const authorization = await resolveTeamCityAuthorizationHeader(config, { user })
@@ -91,12 +100,13 @@ export default defineEventHandler(async (event) => {
     }
     const tc = await queueTeamCityBuild({
       config,
+      baseUrl: tcBase,
       buildTypeId,
       properties,
       authorization,
     })
     const tcAuthUserKey = integrationUserKey(user)
-    markTcPending(id, { action, buildId: tc.buildId, tcAuthUserKey })
+    markTcPending(id, { action, buildId: tc.buildId, tcAuthUserKey, tcRestBaseUrl: tcBase })
     const auditAction =
       action === 'start'
         ? AUDIT_ACTION.OTE_TC_START

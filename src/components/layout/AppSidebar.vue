@@ -4,7 +4,7 @@
     :style="{ minHeight: 'calc(100vh - 3.5rem)' }"
   >
     <NuxtLink
-      v-for="item in items"
+      v-for="item in navItems"
       :key="item.to"
       :to="item.to"
       class="flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-sm font-semibold text-slate-500 transition hover:bg-brand-light hover:text-brand"
@@ -43,13 +43,17 @@ import {
   Info,
   LayoutGrid,
   ScrollText,
+  SlidersHorizontal,
   Star,
   UserRound,
+  UsersRound,
 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useOteTemplateShortcuts } from '~/composables/useOteTemplateShortcuts.js'
+import { useAuthStore } from '~/stores/auth'
 
 const route = useRoute()
+const auth = useAuthStore()
 const { favoriteIds, loadShortcuts, orderedRecentIds } = useOteTemplateShortcuts()
 const buildTemplates = ref(/** @type {any[]} */ ([]))
 
@@ -85,16 +89,27 @@ onMounted(async () => {
   buildTemplates.value = Array.isArray(res?.templates) ? res.templates : []
 })
 
-const items = [
-  { to: '/', label: 'Главная', icon: Home, match: 'home' },
-  { to: '/environments', label: 'Окружения OTE', icon: LayoutGrid, match: 'environments' },
-  { to: '/create', label: 'Создать OTE', icon: CirclePlus, match: 'create' },
-  { to: '/templates', label: 'Шаблоны', icon: FileStack, match: 'templates' },
-  { to: '/audit', label: 'Аудит', icon: ScrollText, match: 'audit' },
-  { to: '/admin/health', label: 'Состояние', icon: Activity, match: 'admin' },
-  { to: '/profile', label: 'Профиль', icon: UserRound, match: 'exact' },
-  { to: '/about', label: 'О проекте', icon: Info, match: 'about' },
-]
+const navItems = computed(() => {
+  const base = [
+    { to: '/', label: 'Главная', icon: Home, match: 'home' },
+    { to: '/environments', label: 'Окружения OTE', icon: LayoutGrid, match: 'environments' },
+    { to: '/create', label: 'Создать OTE', icon: CirclePlus, match: 'create' },
+    { to: '/templates', label: 'Шаблоны', icon: FileStack, match: 'templates' },
+    { to: '/admin/health', label: 'Состояние', icon: Activity, match: 'admin-health' },
+  ]
+  if (auth.isAdmin) {
+    base.push(
+      { to: '/audit', label: 'Аудит', icon: ScrollText, match: 'audit' },
+      { to: '/admin/users', label: 'Пользователи', icon: UsersRound, match: 'admin-users' },
+      { to: '/admin/system', label: 'Система', icon: SlidersHorizontal, match: 'admin-system' },
+    )
+  }
+  base.push(
+    { to: '/profile', label: 'Профиль', icon: UserRound, match: 'exact' },
+    { to: '/about', label: 'О проекте', icon: Info, match: 'about' },
+  )
+  return base
+})
 
 function isActive(item) {
   if (item.match === 'exact') return route.path === item.to
@@ -103,7 +118,9 @@ function isActive(item) {
   if (item.match === 'about') return route.path.startsWith('/about')
   if (item.match === 'templates') return route.path.startsWith('/templates')
   if (item.match === 'audit') return route.path.startsWith('/audit')
-  if (item.match === 'admin') return route.path.startsWith('/admin')
+  if (item.match === 'admin-health') return route.path.startsWith('/admin/health')
+  if (item.match === 'admin-users') return route.path.startsWith('/admin/users')
+  if (item.match === 'admin-system') return route.path.startsWith('/admin/system')
   if (item.match === 'environments') {
     return route.path === '/environments' || route.path.startsWith('/environments/')
   }

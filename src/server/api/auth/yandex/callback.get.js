@@ -8,6 +8,8 @@ import {
 } from '../../../utils/ote-session'
 import { assertAllowedEmailDomain, exchangeYandexCode, fetchYandexLoginInfo } from '../../../utils/yandex-oauth'
 import { safeReturnPath } from '../../../utils/safe-return-path'
+import { getDb } from '../../../db/client.js'
+import { ensureOteUserRbacState } from '../../../utils/rbac/bootstrap.js'
 
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event)
@@ -100,6 +102,18 @@ export default defineEventHandler(async (event) => {
     oteTag: null,
     details: { name },
   })
+
+  try {
+    const db = getDb()
+    await ensureOteUserRbacState(db, config, {
+      login: info.login || '',
+      email: email || '',
+      id: String(info.id),
+      name,
+    })
+  } catch {
+    /* RBAC не должен ломать вход */
+  }
 
   clearOAuthCookies()
 

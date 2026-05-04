@@ -98,10 +98,13 @@ export default defineNuxtConfig({
      * Пусто — страницу видит любой вошедший пользователь (удобно во внутренней сети).
      */
     healthAdminEmails: envPick('NUXT_HEALTH_ADMIN_EMAILS', ''),
+    /**
+     * Глобальный администратор RBAC: email (без учёта регистра). При каждом входе пользователю выдаётся роль `admin`
+     * в дополнение к `user`. Остальных админов назначают через страницу «Пользователи».
+     */
+    oteGlobalAdminEmail: envPick('NUXT_OTE_GLOBAL_ADMIN_EMAIL', ''),
     /** Опционально: SHA коммита для отображения на странице состояния (передайте из CI). */
     healthBuildSha: envPick('NUXT_BUILD_SHA', ''),
-    /** Yandex Cloud: каталог с ВМ (folder id из консоли). */
-    ycFolderId: envPick('NUXT_YC_FOLDER_ID'),
     /** Путь к JSON-ключу сервисного аккаунта (от корня репозитория или абсолютный). */
     ycSaKeyPath: envPick('NUXT_YC_SA_KEY_PATH'),
     /** Либо сам JSON ключа в одной строке (без переносов) — нежелательно для прод. */
@@ -160,17 +163,6 @@ export default defineNuxtConfig({
     /** Квоты для блока «как в TeamCity» (суммы по всем отфильтрованным ВМ). */
     ycQuotaMaxCpu: envPick('NUXT_YC_QUOTA_MAX_CPU', '400'),
     ycQuotaMaxMemoryGb: envPick('NUXT_YC_QUOTA_MAX_MEMORY_GB', '1000'),
-    /** Базовый URL REST TeamCity (без хвостового /). */
-    tcRestBaseUrl: envPick('NUXT_TC_REST_BASE_URL', 'https://ci.pravo.tech'),
-    /** Персональный токен TeamCity для REST: заголовок `Authorization: Bearer` (см. справку JetBrains по token.value). */
-    tcAccessToken: envPick('NUXT_TC_ACCESS_TOKEN'),
-    /** Альтернатива токену: логин/пароль к TeamCity. */
-    tcUsername: envPick('NUXT_TC_USERNAME'),
-    tcPassword: envPick('NUXT_TC_PASSWORD'),
-    /** Конфигурации сборок Start/Stop/Delete по metadata.tag. */
-    tcStartBuildTypeId: envPick('NUXT_TC_START_BUILD_TYPE_ID', 'CasePro_UniversalDeploy_StartByTag'),
-    tcStopBuildTypeId: envPick('NUXT_TC_STOP_BUILD_TYPE_ID', 'CasePro_UniversalDeploy_StopByTag'),
-    tcDeleteBuildTypeId: envPick('NUXT_TC_DELETE_BUILD_TYPE_ID', 'CasePro_UniversalDeploy_Delete'),
     public: {
       /** Явно из .env.local / process.env — иначе на клиенте иногда остаётся пусто при srcDir. */
       yandexClientId: envPick('NUXT_PUBLIC_YANDEX_CLIENT_ID'),
@@ -186,11 +178,6 @@ export default defineNuxtConfig({
       oteAppLinksHost: envPick('NUXT_PUBLIC_OTE_APP_LINKS_HOST', ''),
       /** Порт RabbitMQ management (http на IP ВМ с rabbit). */
       oteRabbitManagementPort: envPick('NUXT_PUBLIC_OTE_RABBIT_MANAGEMENT_PORT', '15672'),
-      /**
-       * URL веб-интерфейса TeamCity (подсказки в профиле). По умолчанию совпадает с типичным REST-хостом.
-       * Можно задать отдельно, если UI и API на разных хостах.
-       */
-      teamcityUiBaseUrl: envPick('NUXT_PUBLIC_TC_UI_BASE_URL', 'https://ci.pravo.tech').replace(/\/+$/, ''),
       /** Семантическая версия приложения (из package.json на этапе сборки) */
       appVersion: appVersionFromPackage,
     },

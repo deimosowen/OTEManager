@@ -8,6 +8,7 @@ import { renderYamlPercentPlaceholders } from './build-template-render.js'
 import { integrationUserKey } from './integrations/user-credentials.js'
 import { oteTcJobAuditActions } from './ote-tc-job-audit.js'
 import { queueTeamCityBuild } from './teamcity/client.js'
+import { fetchTeamCityGroupSettingsByUserKey } from './teamcity/group-settings.js'
 import { resolveTeamCityAuthorizationHeader } from './teamcity/resolve-auth.js'
 
 /**
@@ -47,6 +48,11 @@ export async function queueOteTcJobFromBuildTemplate(opts) {
   tcProps.default_deploymet_config_template = renderedYaml
 
   const authorization = await resolveTeamCityAuthorizationHeader(config, { user })
+  const tcGroup = await fetchTeamCityGroupSettingsByUserKey(db, userKey)
+  const tcBase = tcGroup?.tcRestBaseUrl ? String(tcGroup.tcRestBaseUrl).trim().replace(/\/+$/, '') : ''
+  if (!tcBase) {
+    throw createError({ statusCode: 503, message: 'Нет настроек TeamCity для вашей группы (REST URL). Обратитесь к администратору.' })
+  }
   const buildTypeId = String(tpl.teamcityBuildTypeId || '').trim()
   if (!buildTypeId) {
     throw createError({ statusCode: 500, message: 'У шаблона не задан teamcityBuildTypeId' })
@@ -58,6 +64,7 @@ export async function queueOteTcJobFromBuildTemplate(opts) {
   try {
     tc = await queueTeamCityBuild({
       config,
+      baseUrl: tcBase,
       buildTypeId,
       properties: tcProps,
       authorization,

@@ -1,4 +1,11 @@
-import { teamCityAuthorizationHeader, teamCityRestBaseUrl } from './config.js'
+/**
+ * @param {unknown} u
+ */
+function normalizeBaseUrl(u) {
+  return String(u ?? '')
+    .trim()
+    .replace(/\/+$/, '')
+}
 
 /**
  * Тело POST /app/rest/buildQueue в формате TeamCity REST (JSON).
@@ -31,28 +38,31 @@ function buildQueueRequestJson(buildTypeId, properties) {
  * Поставить сборку в очередь TeamCity (REST).
  * @param {{
  *   config: import('@nuxt/schema').NitroRuntimeConfig,
+ *   baseUrl: string,
  *   buildTypeId: string,
  *   properties: Record<string, string>,
+ *   authorization: string,
  * }} opts
  */
 export async function queueTeamCityBuild(opts) {
-  const { config, buildTypeId, properties, authorization: authorizationOverride } = opts
-  const baseUrl = teamCityRestBaseUrl(config)
-  const authorization = authorizationOverride || teamCityAuthorizationHeader(config)
-  if (!authorization) {
-    throw new Error(
-      'TeamCity не настроен: укажите токен в профиле или задайте NUXT_TC_ACCESS_TOKEN (Bearer) / NUXT_TC_USERNAME и NUXT_TC_PASSWORD (Basic) на сервере',
-    )
+  const { buildTypeId, properties, authorization, baseUrl } = opts
+  const b = normalizeBaseUrl(baseUrl)
+  if (!b) {
+    throw new Error('TeamCity: не задан baseUrl (REST из настроек группы в БД)')
+  }
+  const auth = String(authorization || '').trim()
+  if (!auth) {
+    throw new Error('TeamCity: нет авторизации — добавьте персональный токен в профиле (раздел «Интеграции»)')
   }
   if (!buildTypeId || !String(buildTypeId).trim()) {
     throw new Error('TeamCity: не указан buildTypeId')
   }
-  const url = `${baseUrl}/app/rest/buildQueue`
+  const url = `${b}/app/rest/buildQueue`
   const body = buildQueueRequestJson(buildTypeId.trim(), properties)
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization: authorization,
+      Authorization: auth,
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
@@ -185,21 +195,21 @@ function isTeamCityBuildExplicitlyTerminal(state, status) {
 
 /**
  * Сборка ещё в очереди TC (после POST /buildQueue id смотрит и buildQueue, и builds).
- * @param {{ config: import('@nuxt/schema').NitroRuntimeConfig, buildId: string }} opts
+ * @param {{ baseUrl: string, buildId: string, authorization: string }} opts
  * @returns {Promise<{ terminal: boolean, state?: string, status?: string, httpStatus: number } | null>}
  */
 async function fetchTeamCityBuildQueueSnapshot(opts) {
-  const { config, buildId, authorization: authorizationOverride } = opts
+  const { buildId, authorization, baseUrl } = opts
   const id = String(buildId || '').trim()
   if (!id) return null
-  const baseUrl = teamCityRestBaseUrl(config)
-  const authorization = authorizationOverride || teamCityAuthorizationHeader(config)
-  if (!authorization) return null
-  const url = `${baseUrl}/app/rest/buildQueue?locator=id:${encodeURIComponent(id)}`
+  const b = normalizeBaseUrl(baseUrl)
+  const auth = String(authorization || '').trim()
+  if (!b || !auth) return null
+  const url = `${b}/app/rest/buildQueue?locator=id:${encodeURIComponent(id)}`
   const res = await fetch(url, {
     method: 'GET',
     headers: {
-      Authorization: authorization,
+      Authorization: auth,
       Accept: 'application/json',
     },
   })
@@ -212,13 +222,13 @@ async function fetchTeamCityBuildQueueSnapshot(opts) {
     if (typeof root.count === 'number' && root.count === 0 && (!root.build || (Array.isArray(root.build) && !root.build.length)))
       return null
     if (root.build != null) {
-      const b = root.build
-      if (Array.isArray(b)) {
+      const bq = root.build
+      if (Array.isArray(bq)) {
         root =
-          b.find((x) => x && typeof x === 'object' && String(x.id ?? '') === id) ||
-          (b[0] && typeof b[0] === 'object' ? b[0] : null)
-      } else if (typeof b === 'object') {
-        root = b
+          bq.find((x) => x && typeof x === 'object' && String(x.id ?? '') === id) ||
+          (bq[0] && typeof bq[0] === 'object' ? bq[0] : null)
+      } else if (typeof bq === 'object') {
+        root = bq
       }
     }
     if (!root || typeof root !== 'object') return null
@@ -247,21 +257,21 @@ function numericBuildIdPresent(bid, expect) {
 
 /**
  * Снимок сборки по id (для снятия блокировки UI после завершения/отмены в TC).
- * @param {{ config: import('@nuxt/schema').NitroRuntimeConfig, buildId: string }} opts
+ * @param {{ baseUrl: string, buildId: string, authorization: string }} opts
  * @returns {Promise<{ terminal: boolean, state?: string, status?: string, httpStatus: number } | null>}
  */
 export async function fetchTeamCityBuildSnapshot(opts) {
-  const { config, buildId, authorization: authorizationOverride } = opts
+  const { buildId, authorization, baseUrl } = opts
   const id = String(buildId || '').trim()
   if (!id) return null
-  const baseUrl = teamCityRestBaseUrl(config)
-  const authorization = authorizationOverride || teamCityAuthorizationHeader(config)
-  if (!authorization) return null
-  const url = `${baseUrl}/app/rest/builds/id:${encodeURIComponent(id)}`
+  const b = normalizeBaseUrl(baseUrl)
+  const auth = String(authorization || '').trim()
+  if (!b || !auth) return null
+  const url = `${b}/app/rest/builds/id:${encodeURIComponent(id)}`
   const res = await fetch(url, {
     method: 'GET',
     headers: {
-      Authorization: authorization,
+      Authorization: auth,
       Accept: 'application/json',
     },
   })
@@ -269,7 +279,7 @@ export async function fetchTeamCityBuildSnapshot(opts) {
    * 404 при переходе «очередь → агент» или гонках REST не считаем завершением сборки.
    */
   if (res.status === 404) {
-    const q = await fetchTeamCityBuildQueueSnapshot({ config, buildId: id, authorization: authorizationOverride })
+    const q = await fetchTeamCityBuildQueueSnapshot({ buildId: id, authorization: auth, baseUrl: b })
     if (q && !q.terminal) return q
     return { terminal: false, state: '', status: '', httpStatus: 404 }
   }

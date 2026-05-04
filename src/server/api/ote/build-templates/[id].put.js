@@ -9,7 +9,7 @@ import { mapBuildTemplateFull } from '../../../utils/build-template-map.js'
 import { assertValidYamlString } from '../../../utils/deployment-template-yaml.js'
 import { integrationUserKey } from '../../../utils/integrations/user-credentials.js'
 import { requireOteUser } from '../../../utils/require-ote-auth.js'
-import { teamCityRestBaseUrl } from '../../../utils/teamcity/config.js'
+import { fetchTeamCityGroupSettingsByUserKey } from '../../../utils/teamcity/group-settings.js'
 
 function parseTemplateId(raw) {
   const n = Number(String(raw || '').trim())
@@ -48,9 +48,19 @@ export default defineEventHandler(async (event) => {
   if (!teamcityBuildTypeId) {
     throw createError({ statusCode: 400, message: 'Укажите buildTypeId TeamCity' })
   }
+  const g = await fetchTeamCityGroupSettingsByUserKey(db, me)
+  const tcUi = g?.tcUiBaseUrl || g?.tcRestBaseUrl || ''
   const teamcityBuildConfigUrl =
     mustString(body, 'teamcityBuildConfigUrl', 2048) ||
-    `${teamCityRestBaseUrl(useRuntimeConfig(event))}/buildConfiguration/${encodeURIComponent(teamcityBuildTypeId)}`
+    (tcUi
+      ? `${tcUi.replace(/\/+$/, '')}/buildConfiguration/${encodeURIComponent(teamcityBuildTypeId)}`
+      : '')
+  if (!teamcityBuildConfigUrl) {
+    throw createError({
+      statusCode: 503,
+      message: 'Не задан URL TeamCity для вашей группы — администратор может настроить его в «Система».',
+    })
+  }
 
   const description = body && typeof body.description === 'string' ? body.description.trim().slice(0, 4000) : ''
   let yamlBody = ''

@@ -12,7 +12,7 @@ import { mapYcInstanceStatusToOte } from './yc/compute.js'
  * - или вызван clearTcPending / API сброса.
  */
 
-/** @type {Map<string, { action: 'start'|'stop'|'delete', queuedAt: string, buildId: string, expiresAt: number, tcAuthUserKey: string }>} */
+/** @type {Map<string, { action: 'start'|'stop'|'delete', queuedAt: string, buildId: string, expiresAt: number, tcAuthUserKey: string, tcRestBaseUrl: string }>} */
 const pendingByOteId = new Map()
 
 /** 25 мин — запас на длинные сборки/прогрев ВМ */
@@ -38,7 +38,7 @@ export function peekTcPending(oteId) {
 
 /**
  * @param {string} oteId
- * @param {{ action: 'start'|'stop'|'delete', buildId?: string, tcAuthUserKey?: string }} rec
+ * @param {{ action: 'start'|'stop'|'delete', buildId?: string, tcAuthUserKey?: string, tcRestBaseUrl?: string }} rec
  */
 export function markTcPending(oteId, rec) {
   const now = Date.now()
@@ -48,6 +48,7 @@ export function markTcPending(oteId, rec) {
     buildId: rec.buildId ? String(rec.buildId) : '',
     expiresAt: now + DEFAULT_TTL_MS,
     tcAuthUserKey: rec.tcAuthUserKey ? String(rec.tcAuthUserKey).slice(0, 256) : '',
+    tcRestBaseUrl: rec.tcRestBaseUrl ? String(rec.tcRestBaseUrl).trim().replace(/\/+$/, '').slice(0, 2048) : '',
   })
 }
 
@@ -90,9 +91,15 @@ export async function resolveTcPendingState(oteId, members, config) {
     config && (await resolveTeamCityAuthorizationHeader(config, { userKey: rec.tcAuthUserKey || undefined }))
 
   const buildId = rec.buildId ? String(rec.buildId).trim() : ''
-  if (buildId && authHeader) {
+  const tcBase = rec.tcRestBaseUrl ? String(rec.tcRestBaseUrl).trim().replace(/\/+$/, '') : ''
+  if (buildId && authHeader && tcBase) {
     try {
-      const snap = await fetchTeamCityBuildSnapshot({ config, buildId, authorization: authHeader })
+      const snap = await fetchTeamCityBuildSnapshot({
+        config,
+        buildId,
+        authorization: authHeader,
+        baseUrl: tcBase,
+      })
       if (snap?.terminal) {
         pendingByOteId.delete(oteId)
         return null
@@ -106,7 +113,7 @@ export async function resolveTcPendingState(oteId, members, config) {
    * Pending выставляется только после успешного вызова TeamCity. Пока есть способ опросить TC — не снимаем
    * блокировку по YC: иначе при пустом buildId в ответе очереди сработает только выключение ВМ, пока сборка ещё идёт.
    */
-  const waitTeamCityFinish = Boolean(authHeader)
+  const waitTeamCityFinish = Boolean(authHeader && tcBase)
 
   if (!members?.length) {
     if (!waitTeamCityFinish && rec.action === 'delete') {

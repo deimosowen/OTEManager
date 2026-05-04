@@ -80,6 +80,29 @@
           <div v-for="n in 4" :key="n" class="h-16 animate-pulse rounded-2xl bg-slate-100" />
         </div>
 
+        <div
+          v-else-if="store.listSource === 'no_folder'"
+          class="relative mt-8 rounded-2xl border border-amber-200/90 bg-amber-50/90 px-5 py-10 text-center"
+        >
+          <Server class="mx-auto size-10 text-amber-600/90" aria-hidden="true" />
+          <p class="mt-3 text-sm font-semibold text-amber-950">{{ store.lastListError }}</p>
+          <p class="mt-2 text-xs font-medium text-amber-900/80">После того как администратор укажет каталог, обновите страницу.</p>
+          <AppButton type="button" variant="secondary" size="sm" class="mt-4 shadow-sm" @click="retryHomeEnvironments">
+            Обновить список
+          </AppButton>
+        </div>
+
+        <div
+          v-else-if="store.listSource === 'error'"
+          class="relative mt-8 rounded-2xl border border-rose-200/90 bg-rose-50/85 px-5 py-10 text-center"
+        >
+          <Server class="mx-auto size-10 text-rose-400" aria-hidden="true" />
+          <p class="mt-3 text-sm font-semibold text-rose-900">{{ store.lastListError }}</p>
+          <AppButton type="button" variant="secondary" size="sm" class="mt-4 shadow-sm" @click="retryHomeEnvironments">
+            Повторить
+          </AppButton>
+        </div>
+
         <div v-else-if="!myOteRows.length" class="relative mt-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-5 py-10 text-center">
           <Server class="mx-auto size-10 text-slate-300" aria-hidden="true" />
           <p class="mt-3 text-sm font-semibold text-slate-600">Пока нет окружений, отмеченных как ваши</p>
@@ -515,9 +538,17 @@ function startPoll() {
   }, 10000)
 }
 
+async function retryHomeEnvironments() {
+  try {
+    await store.refreshFromYandexApi()
+  } catch {
+    /* lastListError уже в сторе */
+  }
+}
+
 onMounted(async () => {
   unsubEnvBroadcast = subscribeOteInstancesRefresh(() => {
-    if (store.listSource === 'yc') void store.refreshFromYandexApi().catch(() => {})
+    if (store.listSource === 'yc' || store.listSource === 'no_folder') void store.refreshFromYandexApi().catch(() => {})
   })
   await Promise.all([
     store.refreshFromYandexApi().catch(() => {}),

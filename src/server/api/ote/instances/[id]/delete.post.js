@@ -4,6 +4,7 @@ import { auditPayloadFromUser, recordAuditEvent } from '../../../../utils/audit-
 import { assertMetadataTagNotBlockedByOteCreation } from '../../../../utils/ote-tc-creation-guard.js'
 import { peekTcPending } from '../../../../utils/ote-tc-pending.js'
 import { requireOteUser } from '../../../../utils/require-ote-auth.js'
+import { requireYcFolderIdForUser } from '../../../../utils/yc/group-settings.js'
 import { COMMAND_TYPES } from '../../../../utils/command-queue/command-types.js'
 import { getCommandQueue } from '../../../../utils/command-queue/queue.js'
 import { runtimeConfigString } from '../../../../utils/yc/config-helpers.js'
@@ -26,10 +27,8 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: 'Требуется confirm: true' })
   }
   const config = useRuntimeConfig(event)
-  const folderId = runtimeConfigString(config.ycFolderId, 'NUXT_YC_FOLDER_ID')
-  if (!folderId) {
-    throw createError({ statusCode: 503, message: 'Не задан NUXT_YC_FOLDER_ID' })
-  }
+  const db = getDb()
+  const folderId = await requireYcFolderIdForUser(db, user)
   const session = createYandexCloudSession(config)
   if (!session) {
     throw createError({ statusCode: 503, message: 'Не настроен ключ сервисного аккаунта YC' })
@@ -52,7 +51,7 @@ export default defineEventHandler(async (event) => {
   const labelKey =
     runtimeConfigString(config.ycInstanceLabelKey, 'NUXT_YC_INSTANCE_LABEL_KEY') || 'metadata-tag'
   const metadataTag = pickMetadataTagFromMembers(members, labelKey)
-  await assertMetadataTagNotBlockedByOteCreation(getDb(), metadataTag)
+  await assertMetadataTagNotBlockedByOteCreation(db, metadataTag)
 
   const jobResult = await getCommandQueue().dispatch(
     COMMAND_TYPES.OTE_INSTANCE_DELETE,

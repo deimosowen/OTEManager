@@ -6,6 +6,7 @@ import { auditPayloadFromUser, recordAuditEvent } from './audit-log.js'
 import { notifyOteTcCreationFinished } from './user-notifications.js'
 import { fetchTeamCityResultingPropertiesMap } from './teamcity/build-details.js'
 import { fetchTeamCityBuildSnapshot } from './teamcity/client.js'
+import { fetchTeamCityGroupSettingsByUserKey } from './teamcity/group-settings.js'
 import { resolveTeamCityAuthorizationHeader } from './teamcity/resolve-auth.js'
 
 const ACTIVE_STATUSES = /** @type {const} */ (['queued', 'running'])
@@ -46,14 +47,14 @@ function teamCityBuildHasLeftQueue(snap) {
  * @param {{ login?: string, email?: string, id?: string }} user — кто опрашивает TC (`OTE_CREATE_TC_QUEUE` в аудит при первой записи tag с агента)
  * @returns {Promise<string | null>} метка после записи или из колонки / параметров запроса
  */
-async function persistMetadataTagFromTcAgentIfEmpty(db, config, authorization, row, now, user) {
+async function persistMetadataTagFromTcAgentIfEmpty(db, config, authorization, baseUrl, row, now, user) {
   const existing = row.metadataTag && String(row.metadataTag).trim()
   if (existing) return existing
 
   const buildId = row.teamcityBuildId ? String(row.teamcityBuildId).trim() : ''
-  if (!buildId || !authorization) return metadataTagFromRequest(row)
+  if (!buildId || !authorization || !baseUrl) return metadataTagFromRequest(row)
 
-  const props = await fetchTeamCityResultingPropertiesMap({ config, buildId, authorization })
+  const props = await fetchTeamCityResultingPropertiesMap({ baseUrl, buildId, authorization })
   const t = props.map['metadata.tag'] != null ? String(props.map['metadata.tag']).trim() : ''
   if (!t) return metadataTagFromRequest(row)
 
@@ -221,13 +222,15 @@ export async function syncOteTcCreationRow(config, user, row) {
   }
 
   const authorization = await resolveTeamCityAuthorizationHeader(config, { userKey: row.actorLogin })
+  const tcGroup = await fetchTeamCityGroupSettingsByUserKey(db, row.actorLogin)
+  const tcBase = tcGroup?.tcRestBaseUrl ? String(tcGroup.tcRestBaseUrl).trim().replace(/\/+$/, '') : ''
   if (!authorization) {
     const tagHint = row.metadataTag || metadataTagFromRequest(row)
     const [updated] = await db
       .update(oteTcCreations)
       .set({
         updatedAt: now,
-        lastError: 'Нет авторизации TeamCity',
+        lastError: 'Нет авторизации TeamCity (персональный токен в профиле)',
         status: 'failed',
       })
       .where(activeRowFilter(row.id))
@@ -253,7 +256,39 @@ export async function syncOteTcCreationRow(config, user, row) {
     return rowToPublic(r || row)
   }
 
-  const snap = await fetchTeamCityBuildSnapshot({ config, buildId, authorization })
+  if (!tcBase) {
+    const tagHint = row.metadataTag || metadataTagFromRequest(row)
+    const [updated] = await db
+      .update(oteTcCreations)
+      .set({
+        updatedAt: now,
+        lastError: 'Нет настроек TeamCity для группы пользователя (REST URL)',
+        status: 'failed',
+      })
+      .where(activeRowFilter(row.id))
+      .returning()
+    if (updated) {
+      await recordAuditEvent(
+        auditPayloadFromUser(user, {
+          actionCode: auditActs.failed,
+          oteResourceId: `tc-creation:${row.id}`,
+          oteTag: tagHint,
+          details: {
+            creationId: row.id,
+            presetId: row.presetId || null,
+            reason: 'no_teamcity_group_settings',
+            teamcityBuildId: buildId,
+            teamcityWebUrl: row.teamcityWebUrl || null,
+          },
+        }),
+      )
+      await notifyOteTcCreationFinished(updated, 'failed', updated.lastError || 'Нет настроек TeamCity для группы')
+    }
+    const [r2] = await db.select().from(oteTcCreations).where(eq(oteTcCreations.id, row.id)).limit(1)
+    return rowToPublic(r2 || row)
+  }
+
+  const snap = await fetchTeamCityBuildSnapshot({ config, buildId, authorization, baseUrl: tcBase })
 
   let tagHint = row.metadataTag || metadataTagFromRequest(row) || null
 
@@ -265,7 +300,7 @@ export async function syncOteTcCreationRow(config, user, row) {
 
   if (!snap.terminal) {
     if (teamCityBuildHasLeftQueue(snap)) {
-      const persisted = await persistMetadataTagFromTcAgentIfEmpty(db, config, authorization, row, now, user)
+      const persisted = await persistMetadataTagFromTcAgentIfEmpty(db, config, authorization, tcBase, row, now, user)
       if (persisted) tagHint = persisted
     }
     await db.update(oteTcCreations).set({ updatedAt: now, status: 'running' }).where(eq(oteTcCreations.id, row.id))
@@ -307,7 +342,7 @@ export async function syncOteTcCreationRow(config, user, row) {
     return rowToPublic(r || row)
   }
 
-  const props = await fetchTeamCityResultingPropertiesMap({ config, buildId, authorization })
+  const props = await fetchTeamCityResultingPropertiesMap({ baseUrl: tcBase, buildId, authorization })
   if (props.httpStatus !== 200) {
     const err = `TeamCity HTTP ${props.httpStatus}: не удалось загрузить resulting properties сборки`
     const [updated] = await db

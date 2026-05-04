@@ -30,6 +30,24 @@ function filePathToLibsqlUrl(filePath) {
   return `file:${normalized}`
 }
 
+/** @param {unknown} err */
+function formatDbMigrationError(err) {
+  if (err == null) return 'unknown error'
+  if (typeof err === 'string') return err
+  if (err instanceof Error) {
+    const parts = [err.message]
+    const c = /** @type {{ cause?: unknown }} */ (err).cause
+    if (c instanceof Error) parts.push(`cause: ${c.message}`)
+    else if (c != null && typeof c === 'object' && 'message' in c) parts.push(`cause: ${String(/** @type {{ message: unknown }} */ (c).message)}`)
+    return parts.join(' | ')
+  }
+  try {
+    return JSON.stringify(err)
+  } catch {
+    return String(err)
+  }
+}
+
 /**
  * Один раз при старте Nitro: миграции + drizzle-клиент.
  * @param {import('@nuxt/schema').NitroRuntimeConfig} config
@@ -42,35 +60,90 @@ export async function initDatabase(config) {
   const client = createClient({ url })
   const db = drizzle(client, { schema })
   const migrationsFolder = resolveMigrationsDir(config?.sqliteMigrationsDir)
-  // Лог старта БД помогает быстро понять, какая БД/миграции реально используются.
-  // (в dev часто удаляют не тот файл или переопределяют NUXT_SQLITE_MIGRATIONS_DIR)
   // eslint-disable-next-line no-console
   console.log('[db] sqlitePath:', filePath)
   // eslint-disable-next-line no-console
   console.log('[db] migrationsFolder:', migrationsFolder)
-  await migrate(db, { migrationsFolder })
 
-  // Smoke-check: миграции обязаны создать новые таблицы/колонки.
-  // Если этого не произошло (например, устаревший meta/_journal.json в артефакте),
-  // лучше упасть при старте с понятным сообщением, чем ловить "no such table" в UI.
   try {
-    const t = await client.execute({
-      sql: "select name from sqlite_master where type='table' and name = ? limit 1",
-      args: ['ote_build_templates'],
-    })
-    const hasBuildTemplates = Array.isArray(t.rows) && t.rows.length > 0
-    if (!hasBuildTemplates) {
+    await migrate(db, { migrationsFolder })
+  } catch (e) {
+    const detail = formatDbMigrationError(e)
+    // eslint-disable-next-line no-console
+    console.error('[db] Ошибка миграции SQLite (drizzle migrate):', detail)
+    if (e instanceof Error && e.stack) {
+      // eslint-disable-next-line no-console
+      console.error(e.stack)
+    }
+    throw new Error(
+      `Миграция БД не выполнилась. sqlitePath=${filePath}; migrationsFolder=${migrationsFolder}. Детали: ${detail}`,
+      { cause: e instanceof Error ? e : undefined },
+    )
+  }
+
+  try {
+    const requiredTables = [
+      'app_roles',
+      'ote_app_groups',
+      'ote_build_templates',
+      'ote_directory_users',
+      'ote_user_role_assignments',
+      'ote_group_teamcity_settings',
+      'ote_group_yc_settings',
+    ]
+    for (const name of requiredTables) {
+      const t = await client.execute({
+        sql: "select name from sqlite_master where type='table' and name = ? limit 1",
+        args: [name],
+      })
+      if (!Array.isArray(t.rows) || t.rows.length === 0) {
+        throw new Error(
+          `Схема БД неполная: нет таблицы «${name}». Проверьте папку миграций и meta/_journal.json. ` +
+            `sqlitePath=${filePath}; migrationsFolder=${migrationsFolder}`,
+        )
+      }
+    }
+    const roles = await client.execute({ sql: 'select count(*) as n from app_roles', args: [] })
+    const n = Number(roles.rows?.[0]?.n ?? 0)
+    if (n < 2) {
       throw new Error(
-        `Не применились миграции: нет таблицы ote_build_templates. ` +
-          `Проверьте, что папка миграций содержит 0009_ote_build_templates.sql и meta/_journal.json включает её. ` +
+        `Схема БД неполная: в app_roles ожидаются минимум 2 строки (роли user/admin), сейчас ${n}. ` +
           `sqlitePath=${filePath}; migrationsFolder=${migrationsFolder}`,
       )
     }
+    const defG = await client.execute({
+      sql: "select id from ote_app_groups where code = 'default' limit 1",
+      args: [],
+    })
+    if (!Array.isArray(defG.rows) || defG.rows.length === 0) {
+      throw new Error(
+        `Схема БД неполная: нет системной группы (ote_app_groups.code = 'default'). ` +
+          `sqlitePath=${filePath}; migrationsFolder=${migrationsFolder}`,
+      )
+    }
+    const orphanDir = await client.execute({
+      sql: 'select count(*) as n from ote_directory_users where group_id is null',
+      args: [],
+    })
+    const orphanN = Number(orphanDir.rows?.[0]?.n ?? 0)
+    if (orphanN > 0) {
+      throw new Error(
+        `Схема БД неполная: у ${orphanN} пользователей каталога не задан group_id. ` +
+          `Проверьте миграцию 0015_ote_app_groups. sqlitePath=${filePath}; migrationsFolder=${migrationsFolder}`,
+      )
+    }
   } catch (e) {
-    const msg = e?.message || String(e)
+    const detail = formatDbMigrationError(e)
     // eslint-disable-next-line no-console
-    console.error('[db] migration check failed:', msg)
-    throw e
+    console.error('[db] Ошибка проверки схемы после миграций:', detail)
+    if (e instanceof Error && e.stack) {
+      // eslint-disable-next-line no-console
+      console.error(e.stack)
+    }
+    throw new Error(
+      `База в нерабочем состоянии после миграций. sqlitePath=${filePath}; migrationsFolder=${migrationsFolder}. Детали: ${detail}`,
+      { cause: e instanceof Error ? e : undefined },
+    )
   }
   dbInstance = db
   return dbInstance

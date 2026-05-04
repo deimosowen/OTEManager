@@ -4,6 +4,7 @@ import { oteTcCreations } from '../../../../../db/schema.js'
 import { integrationUserKey } from '../../../../../utils/integrations/user-credentials.js'
 import { requireOteUser } from '../../../../../utils/require-ote-auth.js'
 import { fetchTeamCityBuildLogPlain } from '../../../../../utils/teamcity/build-log.js'
+import { fetchTeamCityGroupSettingsByUserKey } from '../../../../../utils/teamcity/group-settings.js'
 import { resolveTeamCityAuthorizationHeader } from '../../../../../utils/teamcity/resolve-auth.js'
 
 function parseId(raw) {
@@ -53,15 +54,25 @@ export default defineEventHandler(async (event) => {
   }
 
   const config = useRuntimeConfig(event)
+  const ownerKey = String(row.actorLogin || '').trim()
   const authorization = await resolveTeamCityAuthorizationHeader(config, { user })
   if (!authorization) {
     throw createError({
       statusCode: 503,
-      message: 'Нет доступа к TeamCity: добавьте токен в профиле или настройте серверные учётные данные.',
+      message: 'Нет доступа к TeamCity: добавьте персональный токен в профиле (раздел «Интеграции»).',
     })
   }
 
-  const result = await fetchTeamCityBuildLogPlain({ config, buildId, authorization })
+  const g = await fetchTeamCityGroupSettingsByUserKey(db, ownerKey)
+  const baseUrl = g?.tcRestBaseUrl ? String(g.tcRestBaseUrl).trim().replace(/\/+$/, '') : ''
+  if (!baseUrl) {
+    throw createError({
+      statusCode: 503,
+      message: 'Нет настроек REST TeamCity для группы автора заявки.',
+    })
+  }
+
+  const result = await fetchTeamCityBuildLogPlain({ baseUrl, buildId, authorization })
 
   if (result.error === 'log_not_ready' || result.httpStatus === 404) {
     return {

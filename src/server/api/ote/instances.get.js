@@ -1,5 +1,6 @@
 import { getDb } from '../../db/client.js'
 import { requireOteUser } from '../../utils/require-ote-auth.js'
+import { getYcFolderIdForUser } from '../../utils/yc/group-settings.js'
 import { getActiveOteTcCreationBlockingByMetadataTagMap } from '../../utils/ote-tc-creation-guard.js'
 import { pickMetadataTagFromMembers } from '../../utils/teamcity/metadata-tag.js'
 import { runtimeConfigString } from '../../utils/yc/config-helpers.js'
@@ -20,12 +21,23 @@ import { listMemberInstancesForOteIdFromFolderInstances } from '../../utils/yc/o
 export default defineEventHandler(async (event) => {
   const user = requireOteUser(event)
   const config = useRuntimeConfig(event)
-  const folderId = runtimeConfigString(config.ycFolderId, 'NUXT_YC_FOLDER_ID')
+  const db = getDb()
+  const folderId = await getYcFolderIdForUser(db, user)
   if (!folderId) {
-    throw createError({
-      statusCode: 503,
-      message: 'Не задан каталог Yandex Cloud (NUXT_YC_FOLDER_ID)',
-    })
+    const labelKey =
+      runtimeConfigString(config.ycInstanceLabelKey, 'NUXT_YC_INSTANCE_LABEL_KEY') || 'metadata-tag'
+    const labelValue = runtimeConfigString(config.ycInstanceLabelValue, 'NUXT_YC_INSTANCE_LABEL_VALUE')
+    const groupBy = runtimeConfigString(config.ycGroupByLabelKey, 'NUXT_YC_GROUP_BY_LABEL_KEY') || 'metadata-tag'
+    return {
+      items: [],
+      tcTable: null,
+      syncedAt: new Date().toISOString(),
+      ycFolderConfigured: false,
+      listHint:
+        'Каталог облака для вашей группы ещё не настроен, поэтому список окружений здесь не показывается. Обратитесь к администратору.',
+      filter: { labelKey, labelValue: labelValue || null, groupBy: groupBy || null },
+      discoverUrl: '/api/ote/discover',
+    }
   }
   const session = createYandexCloudSession(config)
   if (!session) {
@@ -48,7 +60,6 @@ export default defineEventHandler(async (event) => {
     mvp,
     actor: { login: user.login || '', email: user.email || '' },
   })
-  const db = getDb()
   /** Один SQL вместо N: активные ote_tc_creations по всем metadata.tag. */
   let blockingByTag = new Map()
   try {
@@ -89,6 +100,7 @@ export default defineEventHandler(async (event) => {
     items,
     tcTable,
     syncedAt: new Date().toISOString(),
+    ycFolderConfigured: true,
     filter: { labelKey, labelValue: labelValue || null, groupBy: groupBy || null },
     discoverUrl: '/api/ote/discover',
   }

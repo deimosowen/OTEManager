@@ -1,4 +1,6 @@
+import { getDb } from '../../db/client.js'
 import { requireOteUser } from '../../utils/require-ote-auth.js'
+import { requireYcFolderIdForUser } from '../../utils/yc/group-settings.js'
 import { runtimeConfigString } from '../../utils/yc/config-helpers.js'
 import { createYandexCloudSession } from '../../utils/yc/session.js'
 import { aggregateDiscoveryFromInstances, listAllInstancesInFolder } from '../../utils/yc/compute.js'
@@ -7,12 +9,10 @@ import { aggregateDiscoveryFromInstances, listAllInstancesInFolder } from '../..
  * Какие ключи **меток** и **user metadata** реально есть у ВМ в каталоге — чтобы настроить MVP и TeamCity.
  */
 export default defineEventHandler(async (event) => {
-  requireOteUser(event)
+  const user = requireOteUser(event)
   const config = useRuntimeConfig(event)
-  const folderId = runtimeConfigString(config.ycFolderId, 'NUXT_YC_FOLDER_ID')
-  if (!folderId) {
-    throw createError({ statusCode: 503, message: 'Не задан NUXT_YC_FOLDER_ID' })
-  }
+  const db = getDb()
+  const folderId = await requireYcFolderIdForUser(db, user)
   const session = createYandexCloudSession(config)
   if (!session) {
     throw createError({ statusCode: 503, message: 'Не настроен ключ сервисного аккаунта YC' })

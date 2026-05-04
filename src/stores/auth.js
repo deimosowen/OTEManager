@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { userHasAdminRole } from '~/constants/rbac'
 import { safeReturnPath } from '~/utils/safe-return-path'
 
 export const useAuthStore = defineStore('auth', {
@@ -7,6 +8,8 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isLoggedIn: (s) => Boolean(s.user),
+    /** Роли приходят из `/api/auth/session` и SSR `event.context.oteUser` (массив кодов из БД). */
+    isAdmin: (s) => userHasAdminRole(s.user?.roles),
     displayName: (s) => s.user?.name || 'Гость',
     initials: (s) => {
       const n = s.user?.name || 'GM'
