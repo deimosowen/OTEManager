@@ -50,6 +50,11 @@ function mergeOteClientRow(prev, incoming) {
   if (!Object.prototype.hasOwnProperty.call(incoming, 'oteTcCreationSummary') && prev.oteTcCreationSummary != null) {
     out.oteTcCreationSummary = prev.oteTcCreationSummary
   }
+  for (const k of ['oteTcUpdateViaManagerAvailable', 'oteTcUpdateResolvedBuildTemplateId']) {
+    if (!Object.prototype.hasOwnProperty.call(incoming, k) && Object.prototype.hasOwnProperty.call(prev, k)) {
+      out[k] = prev[k]
+    }
+  }
   return out
 }
 

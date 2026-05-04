@@ -16,6 +16,7 @@ export async function getActiveOteTcCreationBlockingByMetadataTagMap(db) {
     .select({
       id: oteTcCreations.id,
       createdAt: oteTcCreations.createdAt,
+      presetId: oteTcCreations.presetId,
       metadataTag: oteTcCreations.metadataTag,
       requestPropertiesJson: oteTcCreations.requestPropertiesJson,
       teamcityBuildId: oteTcCreations.teamcityBuildId,
@@ -25,7 +26,7 @@ export async function getActiveOteTcCreationBlockingByMetadataTagMap(db) {
     .where(inArray(oteTcCreations.status, ACTIVE_CREATION_STATUSES))
     .orderBy(desc(oteTcCreations.createdAt))
 
-  /** @type {Map<string, { id: number, teamcityBuildId: string | null, teamcityWebUrl: string | null }>} */
+  /** @type {Map<string, { id: number, presetId: string | null, teamcityBuildId: string | null, teamcityWebUrl: string | null }>} */
   const byTag = new Map()
   for (const row of rows) {
     /** @type {Set<string>} */
@@ -44,6 +45,7 @@ export async function getActiveOteTcCreationBlockingByMetadataTagMap(db) {
     }
     const payload = {
       id: row.id,
+      presetId: row.presetId != null ? String(row.presetId) : null,
       teamcityBuildId: row.teamcityBuildId,
       teamcityWebUrl: row.teamcityWebUrl,
     }
@@ -70,6 +72,7 @@ export async function findBlockingOteTcCreationForMetadataTag(db, metadataTag) {
     .select({
       id: oteTcCreations.id,
       status: oteTcCreations.status,
+      presetId: oteTcCreations.presetId,
       teamcityBuildId: oteTcCreations.teamcityBuildId,
       teamcityWebUrl: oteTcCreations.teamcityWebUrl,
     })
@@ -99,7 +102,7 @@ export async function assertMetadataTagNotBlockedByOteCreation(db, metadataTag) 
   throw createError({
     statusCode: 409,
     message:
-      'Для этой метки (metadata.tag) выполняется создание OTE через TeamCity. Дождитесь завершения сборки — остановка, удаление и другие действия с машинами недоступны.',
+      'Для этой метки (metadata.tag) уже идёт сборка TeamCity (создание или обновление OTE). Дождитесь завершения — остановка, удаление и другие действия с машинами недоступны.',
     data: {
       reason: 'ote_tc_creation_active',
       oteTcCreationId: hit.id,

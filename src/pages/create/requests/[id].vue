@@ -9,7 +9,9 @@
           <ArrowLeft class="size-3.5" aria-hidden="true" />
           К созданию OTE
         </NuxtLink>
-        <h1 class="mt-2 text-[22px] font-extrabold tracking-tight text-slate-900">Создание OTE · запрос #{{ routeId }}</h1>
+        <h1 class="mt-2 text-[22px] font-extrabold tracking-tight text-slate-900">
+          {{ requestPageTitle }}
+        </h1>
         <p class="mt-1 text-sm font-medium text-slate-500">
           Статус и лог сборки TeamCity обновляются автоматически.
         </p>
@@ -157,6 +159,15 @@ const buildTemplateId = computed(() => {
   return Number.isFinite(n) ? n : null
 })
 
+const OTE_UPDATE_PRESET = 'build-template-update'
+
+const isUpdateRequest = computed(() => String(creation.value?.presetId || '') === OTE_UPDATE_PRESET)
+
+const requestPageTitle = computed(() => {
+  const id = routeId.value
+  return isUpdateRequest.value ? `Обновление OTE · запрос #${id}` : `Создание OTE · запрос #${id}`
+})
+
 const logEmptyMessage = computed(() => {
   if (logHint.value) return ''
   return 'Текст лога появится после старта сборки на агенте.'
@@ -273,5 +284,8 @@ watch(
 
 onBeforeUnmount(() => stopPoll())
 
-useHead({ title: () => `Создание OTE #${routeId.value} · OTE Manager` })
+useHead({
+  title: () =>
+    `${isUpdateRequest.value ? 'Обновление' : 'Создание'} OTE #${routeId.value} · OTE Manager`,
+})
 </script>

@@ -193,7 +193,12 @@
                 v-if="store.listSource === 'yc' && row.oteTcCreationBlocking"
                 class="border-t border-sky-100 bg-sky-50 px-4 py-2 text-[11px] font-semibold leading-snug text-sky-950"
               >
-                Идёт создание OTE (запрос #{{ row.oteTcCreationBlocking.id }}). Старт, стоп и удаление недоступны.
+                {{
+                  String(row.oteTcCreationBlocking?.presetId || '') === OTE_UPDATE_PRESET
+                    ? 'Идёт обновление OTE'
+                    : 'Идёт создание OTE'
+                }}
+                (запрос #{{ row.oteTcCreationBlocking.id }}). Старт, стоп и удаление недоступны.
                 <NuxtLink
                   :to="`/create/requests/${row.oteTcCreationBlocking.id}`"
                   class="ml-1 font-bold text-brand underline decoration-brand/30 underline-offset-2"
@@ -223,7 +228,9 @@
             </span>
             <div>
               <h2 class="text-lg font-extrabold tracking-tight text-slate-900">Активные операции</h2>
-              <p class="mt-1 text-sm font-medium text-slate-500">Создание OTE в TeamCity — пока сборка не завершена.</p>
+              <p class="mt-1 text-sm font-medium text-slate-500">
+                Создание или обновление OTE в TeamCity — пока сборка не завершена.
+              </p>
             </div>
           </div>
         </div>
@@ -238,7 +245,9 @@
         >
           <Sparkles class="mx-auto size-10 text-slate-300" aria-hidden="true" />
           <p class="mt-3 text-sm font-semibold text-slate-600">Нет активных сборок</p>
-          <p class="mt-1 text-xs font-medium text-slate-400">Запустите создание OTE — статус появится здесь автоматически.</p>
+          <p class="mt-1 text-xs font-medium text-slate-400">
+            Запустите создание или обновление OTE — статус появится здесь автоматически.
+          </p>
         </div>
 
         <ul v-else class="relative mt-6 space-y-3">
@@ -248,7 +257,7 @@
               class="flex flex-col gap-2 rounded-2xl border border-amber-100 bg-gradient-to-br from-amber-50/90 to-white px-4 py-3.5 transition hover:border-amber-200 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
             >
               <div class="min-w-0">
-                <p class="font-extrabold text-slate-900">Создание OTE · запрос #{{ c.id }}</p>
+                <p class="font-extrabold text-slate-900">{{ activeCreationRequestTitle(c) }}</p>
                 <p class="mt-0.5 text-xs font-medium text-slate-500">
                   <span v-if="c.teamcityBuildId" class="font-mono">build {{ c.teamcityBuildId }}</span>
                 </p>
@@ -295,6 +304,14 @@ import { oteTcCreationStatusLabel } from '~/utils/ote-tc-creation-status.js'
 
 const store = useEnvironmentsStore()
 const toast = useToast()
+
+const OTE_UPDATE_PRESET = 'build-template-update'
+
+function activeCreationRequestTitle(c) {
+  return String(c?.presetId || '') === OTE_UPDATE_PRESET
+    ? `Обновление OTE · запрос #${c.id}`
+    : `Создание OTE · запрос #${c.id}`
+}
 
 function creationStatusPillClass(s) {
   if (s === 'queued') return 'bg-amber-100 text-amber-950'

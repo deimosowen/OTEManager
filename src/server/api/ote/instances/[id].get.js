@@ -17,9 +17,33 @@ import {
   resolveListGroupKey,
 } from '../../../utils/yc/compute.js'
 import { findBlockingOteTcCreationForMetadataTag } from '../../../utils/ote-tc-creation-guard.js'
+import { fetchLatestSucceededOteTcCreationForMetadataTag } from '../../../utils/ote-tc-creation-latest-succeeded.js'
 import { resolveTcPendingState } from '../../../utils/ote-tc-pending.js'
 import { pickMetadataTagFromMembers } from '../../../utils/teamcity/metadata-tag.js'
 import { buildMvpOptsFromRuntimeConfig } from '../../../utils/yc/mvp-from-config.js'
+
+/**
+ * Можно ли поставить обновление через менеджер: нужна успешная сборка с тем же `metadata.tag`, чтобы взять `build_template_id`.
+ * @param {import('drizzle-orm').LibSQLDatabase} db
+ * @param {Record<string, unknown>} item
+ * @param {string} metadataTag
+ */
+async function attachOteTcUpdateViaManager(db, item, metadataTag) {
+  const tag = String(metadataTag || '').trim()
+  item.oteTcUpdateViaManagerAvailable = false
+  item.oteTcUpdateResolvedBuildTemplateId = null
+  if (!tag) return
+  try {
+    const row = await fetchLatestSucceededOteTcCreationForMetadataTag(db, tag)
+    const tid = row?.buildTemplateId != null ? Number(row.buildTemplateId) : NaN
+    if (Number.isFinite(tid) && tid >= 1) {
+      item.oteTcUpdateViaManagerAvailable = true
+      item.oteTcUpdateResolvedBuildTemplateId = tid
+    }
+  } catch {
+    /* оставляем false */
+  }
+}
 
 /**
  * Детальная информация по одной ВМ (GetInstance FULL) или по группе `grp:<ключ>`.
@@ -67,6 +91,7 @@ export default defineEventHandler(async (event) => {
       item.oteTcCreationBlocking = hitGrp
         ? {
             id: hitGrp.id,
+            presetId: hitGrp.presetId != null ? String(hitGrp.presetId) : null,
             teamcityBuildId: hitGrp.teamcityBuildId,
             teamcityWebUrl: hitGrp.teamcityWebUrl,
           }
@@ -89,6 +114,7 @@ export default defineEventHandler(async (event) => {
     } else {
       item.oteTcCreationSummary = null
     }
+    await attachOteTcUpdateViaManager(getDb(), item, metaTagGrp)
     return { item }
   }
 
@@ -115,6 +141,7 @@ export default defineEventHandler(async (event) => {
     item.oteTcCreationBlocking = hitVm
       ? {
           id: hitVm.id,
+          presetId: hitVm.presetId != null ? String(hitVm.presetId) : null,
           teamcityBuildId: hitVm.teamcityBuildId,
           teamcityWebUrl: hitVm.teamcityWebUrl,
         }
@@ -137,5 +164,6 @@ export default defineEventHandler(async (event) => {
   } else {
     item.oteTcCreationSummary = null
   }
+  await attachOteTcUpdateViaManager(getDb(), item, metaTagVm)
   return { item }
 })

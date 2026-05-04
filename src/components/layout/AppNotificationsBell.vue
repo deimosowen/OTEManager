@@ -87,7 +87,7 @@
                           class="inline-block rounded-md px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide"
                           :class="pillClass(n.kind)"
                         >
-                          {{ n.kind === APP_NOTIFICATION_KIND.OTE_CREATE_SUCCEEDED ? 'Готово' : 'Ошибка' }}
+                          {{ notificationKindShortLabel(n.kind) }}
                         </span>
                         <p class="mt-1.5 text-sm font-extrabold leading-snug text-slate-900">{{ n.title }}</p>
                         <p v-if="n.body" class="mt-0.5 line-clamp-3 text-xs font-medium leading-relaxed text-slate-600">
@@ -134,8 +134,23 @@ useAppNotificationsStream()
 const open = ref(false)
 const rootRef = ref(null)
 
+function notificationKindShortLabel(kind) {
+  if (
+    kind === APP_NOTIFICATION_KIND.OTE_CREATE_SUCCEEDED ||
+    kind === APP_NOTIFICATION_KIND.OTE_UPDATE_SUCCEEDED
+  ) {
+    return 'Готово'
+  }
+  return 'Ошибка'
+}
+
 function pillClass(kind) {
-  if (kind === APP_NOTIFICATION_KIND.OTE_CREATE_SUCCEEDED) return 'bg-emerald-100 text-emerald-900'
+  if (
+    kind === APP_NOTIFICATION_KIND.OTE_CREATE_SUCCEEDED ||
+    kind === APP_NOTIFICATION_KIND.OTE_UPDATE_SUCCEEDED
+  ) {
+    return 'bg-emerald-100 text-emerald-900'
+  }
   return 'bg-rose-100 text-rose-950'
 }
 

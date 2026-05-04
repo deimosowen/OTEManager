@@ -2,6 +2,7 @@ import { getDb } from '../db/client.js'
 import { userNotifications } from '../db/schema.js'
 import { APP_NOTIFICATION_KIND } from '@app-constants/notifications.js'
 import { integrationUserKey } from './integrations/user-credentials.js'
+import { isOteTcUpdatePreset } from './ote-tc-job-audit.js'
 import { publishUserNotificationJson } from './notification-sse-bus.js'
 import { mapUserNotificationRow } from './user-notification-map.js'
 
@@ -34,17 +35,32 @@ export async function notifyOteTcCreationFinished(row, outcome, detail = '') {
   if (!Number.isFinite(id)) return
 
   const succeeded = outcome === 'succeeded'
-  const kind = succeeded ? APP_NOTIFICATION_KIND.OTE_CREATE_SUCCEEDED : APP_NOTIFICATION_KIND.OTE_CREATE_FAILED
+  const upd = isOteTcUpdatePreset(row.presetId)
+  const kind = succeeded
+    ? upd
+      ? APP_NOTIFICATION_KIND.OTE_UPDATE_SUCCEEDED
+      : APP_NOTIFICATION_KIND.OTE_CREATE_SUCCEEDED
+    : upd
+      ? APP_NOTIFICATION_KIND.OTE_UPDATE_FAILED
+      : APP_NOTIFICATION_KIND.OTE_CREATE_FAILED
   const href = `/create/requests/${id}`
   const tag = row.metadataTag && String(row.metadataTag).trim()
-  const title = succeeded ? 'OTE успешно создана' : 'Создание OTE завершилось с ошибкой'
+  const title = succeeded
+    ? upd
+      ? 'OTE успешно обновлена'
+      : 'OTE успешно создана'
+    : upd
+      ? 'Обновление OTE завершилось с ошибкой'
+      : 'Создание OTE завершилось с ошибкой'
 
   let body = ''
   if (succeeded) {
     const parts = []
     if (tag) parts.push(`Метка: ${tag}`)
     if (row.caseoneVersion && String(row.caseoneVersion).trim()) parts.push(`Версия: ${String(row.caseoneVersion).trim()}`)
-    body = parts.join(' · ') || 'Сборка TeamCity прошла успешно. Откройте запрос для логов и ссылок.'
+    body =
+      parts.join(' · ') ||
+      (upd ? 'Сборка обновления прошла успешно.' : 'Сборка TeamCity прошла успешно. Откройте запрос для логов и ссылок.')
   } else {
     body = clipBody(detail || row.lastError) || 'Сборка завершилась неуспешно. Подробности в логе TeamCity.'
   }

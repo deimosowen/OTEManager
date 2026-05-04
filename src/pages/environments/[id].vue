@@ -13,6 +13,50 @@
     @confirm="confirmSeedDelete"
   />
 
+  <Teleport to="body">
+    <div
+      v-if="updateModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ote-update-modal-title"
+    >
+      <div class="absolute inset-0 bg-slate-900/55 backdrop-blur-[2px]" aria-hidden="true" @click="closeUpdateOteModal" />
+      <div
+        class="relative w-full max-w-[440px] overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl ring-1 ring-slate-900/5"
+        @click.stop
+      >
+        <div class="h-1 bg-gradient-to-r from-brand via-sky-500 to-sky-400" aria-hidden="true" />
+        <div class="p-6 sm:p-7">
+          <h2 id="ote-update-modal-title" class="text-lg font-extrabold tracking-tight text-slate-900">Обновить OTE</h2>
+          <p class="mt-2 text-sm font-medium leading-relaxed text-slate-600">
+            Запускается та же сборка TeamCity, что при создании. Параметр
+            <span class="font-mono text-slate-800">metadata.tag</span> берётся с текущей OTE — существующее окружение
+            обновится по этой метке.
+          </p>
+          <label class="mt-5 block text-xs font-extrabold uppercase tracking-wide text-slate-500" for="ote-update-c1-version">
+            caseone.version
+          </label>
+          <input
+            id="ote-update-c1-version"
+            v-model="updateVersionDraft"
+            type="text"
+            autocomplete="off"
+            class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
+            placeholder="например 3.2.1"
+            @keydown.enter.prevent="submitOteUpdate"
+          />
+          <div class="mt-7 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-5">
+            <AppButton variant="secondary" :disabled="updateBusy" @click="closeUpdateOteModal">Отмена</AppButton>
+            <AppButton variant="primary" :loading="updateBusy" :disabled="!updateVersionDraft.trim()" @click="submitOteUpdate">
+              Запустить
+            </AppButton>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <div v-if="env">
     <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0">
@@ -74,7 +118,7 @@
             :to="`/create/requests/${env.oteTcCreationBlocking.id}`"
             class="self-start text-xs font-bold text-brand underline decoration-brand/30 underline-offset-2"
           >
-            Открыть запрос создания · логи TeamCity
+            Открыть запрос · логи TeamCity
           </NuxtLink>
         </div>
 
@@ -159,7 +203,13 @@
             <Square class="size-3.5" />
             Стоп
           </AppButton>
-          <AppButton variant="secondary" size="md" :disabled="!ycCanRefresh" @click="refreshOte">
+          <AppButton
+            variant="secondary"
+            size="md"
+            :disabled="!ycCanSubmitOteUpdate"
+            :title="ycOteUpdateDisabledTitle"
+            @click="openUpdateOteModal"
+          >
             Обновить OTE
           </AppButton>
           <AppButton
@@ -507,12 +557,6 @@
         <h2 class="text-[15px] font-extrabold text-slate-900">Аудит по этой OTE</h2>
         <AppButton variant="secondary" size="sm" class="!text-xs" :loading="oteAuditLoading" @click="loadOteAudit">Обновить</AppButton>
       </div>
-      <p class="mb-3 text-xs font-semibold text-slate-500">
-        Время в таблице — в вашем часовом поясе из
-        <NuxtLink to="/profile" class="text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand">профиля</NuxtLink>
-        ({{ timeZone }}). Фильтры «С»/«По» задают календарные сутки в UTC. В выборку входят события по id карточки и по метке OTE
-        (metadata.tag), в т.ч. создание через TeamCity. Поиск — по логину, почте и метке.
-      </p>
       <div class="mb-4 flex flex-wrap items-end gap-2">
         <div class="min-w-[140px] flex-1 sm:max-w-[200px]">
           <AppSelect v-model="oteAuditFilterAction" label="Действие" :options="AUDIT_ACTION_FILTER_OPTIONS" />
@@ -649,6 +693,12 @@ const deleteBusy = ref(false)
 /** '' | 'start' | 'stop' — запрос к TeamCity с карточки */
 const tcBusy = ref('')
 
+const updateModalOpen = ref(false)
+const updateVersionDraft = ref('')
+const updateBusy = ref(false)
+
+const OTE_UPDATE_PRESET = 'build-template-update'
+
 const oteAuditRows = ref([])
 const oteAuditLoading = ref(false)
 const oteAuditError = ref('')
@@ -702,13 +752,48 @@ const headlineStatus = computed(() => {
   return OTE_STATUS_LABELS[e.status] || '—'
 })
 
-const ycCanRefresh = computed(() => Boolean(isYc.value))
+/** Все ВМ OTE в YC в состоянии «работает» (иначе обновление по тегу недоступно). */
+const allYcInstancesRunning = computed(() => {
+  const e = env.value
+  if (!e || e.source !== 'yc') return false
+  const t = e.instances?.total
+  const r = e.instances?.ready
+  if (typeof t !== 'number' || t < 1) return false
+  if (typeof r !== 'number' || r !== t) return false
+  return e.status === OTE_STATUS.RUNNING
+})
+
+const ycCanSubmitOteUpdate = computed(() => {
+  const e = env.value
+  if (!e || e.source !== 'yc') return false
+  if (e.status === OTE_STATUS.DELETING) return false
+  if (e.tcOperationPending) return false
+  if (e.oteTcCreationBlocking) return false
+  if (!e.oteTcUpdateViaManagerAvailable) return false
+  return allYcInstancesRunning.value
+})
+
+const ycOteUpdateDisabledTitle = computed(() => {
+  if (!isYc.value) return ''
+  const e = env.value
+  if (!e) return ''
+  if (e.status === OTE_STATUS.DELETING) return 'Окружение удаляется'
+  if (e.tcOperationPending) return 'Дождитесь завершения операции TeamCity'
+  if (e.oteTcCreationBlocking) return 'Уже идёт сборка по этой метке'
+  if (!allYcInstancesRunning.value) return 'Нужны все ВМ в состоянии «работает» (запустите остановленные)'
+  if (!e.oteTcUpdateViaManagerAvailable) {
+    return 'Обновление через менеджер возможно только если эта OTE уже успешно создавалась здесь по тому же metadata.tag — тогда известен шаблон TeamCity. Иначе используйте API с полем buildTemplateId.'
+  }
+  return ''
+})
 
 /** Те же правила, что в таблице списка (`OteMvpYcTable`). */
 const oteCreationBlockingCardText = computed(() => {
   const b = env.value?.oteTcCreationBlocking
   if (!b?.id) return ''
-  return `Для этой метки выполняется создание OTE (запрос #${b.id}). Старт, стоп и удаление недоступны, пока сборка в TeamCity не завершится успешно или с ошибкой.`
+  const upd = String(b?.presetId || '') === OTE_UPDATE_PRESET
+  const kind = upd ? 'обновление' : 'создание'
+  return `Для этой метки выполняется ${kind} OTE (запрос #${b.id}). Старт, стоп, удаление и повторное обновление недоступны, пока сборка в TeamCity не завершится успешно или с ошибкой.`
 })
 
 const cardCanStart = computed(() => {
@@ -940,10 +1025,44 @@ async function runTeamCity(action) {
   }
 }
 
-async function refreshOte() {
-  if (!ycCanRefresh.value) return
-  await loadDetail()
-  toast.show('Сведения об OTE обновлены', 'success')
+function openUpdateOteModal() {
+  if (!ycCanSubmitOteUpdate.value) return
+  const e = env.value
+  updateVersionDraft.value = String(e?.caseOneVersion || '').trim() || ''
+  updateModalOpen.value = true
+}
+
+function closeUpdateOteModal() {
+  if (updateBusy.value) return
+  updateModalOpen.value = false
+}
+
+async function submitOteUpdate() {
+  const id = apiId.value
+  const v = updateVersionDraft.value.trim()
+  if (!id || !v || updateBusy.value) return
+  updateBusy.value = true
+  try {
+    await $fetch(`/api/ote/instances/${encodeURIComponent(id)}/update`, {
+      method: 'POST',
+      body: { caseoneVersion: v },
+      credentials: 'include',
+    })
+    toast.show('Сборка обновления поставлена в TeamCity.', 'success')
+    updateModalOpen.value = false
+    await loadDetail()
+    try {
+      await store.refreshFromYandexApi()
+    } catch {
+      /* ignore */
+    }
+    notifyOteInstancesRefresh()
+  } catch (err) {
+    const sc = err?.statusCode ?? err?.response?.status
+    toast.show(err?.data?.message || err?.message || String(err), sc === 409 ? 'warn' : 'error')
+  } finally {
+    updateBusy.value = false
+  }
 }
 
 async function clearTcLockFromCard() {

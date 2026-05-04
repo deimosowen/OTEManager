@@ -1,5 +1,5 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm'
-import { AUDIT_ACTION } from '@app-constants/audit.js'
+import { oteTcJobAuditActions } from './ote-tc-job-audit.js'
 import { getDb } from '../db/client.js'
 import { oteTcCreations } from '../db/schema.js'
 import { auditPayloadFromUser, recordAuditEvent } from './audit-log.js'
@@ -64,13 +64,15 @@ async function persistMetadataTagFromTcAgentIfEmpty(db, config, authorization, r
     .returning({ id: oteTcCreations.id })
 
   if (inserted.length) {
+    const audit = oteTcJobAuditActions(row.presetId)
     await recordAuditEvent(
       auditPayloadFromUser(user, {
-        actionCode: AUDIT_ACTION.OTE_CREATE_TC_QUEUE,
+        actionCode: audit.queue,
         oteResourceId: `tc-creation:${row.id}`,
         oteTag: t,
         details: {
           creationId: row.id,
+          presetId: row.presetId || null,
           buildTemplateId: row.buildTemplateId != null ? row.buildTemplateId : null,
           buildTypeId: row.buildTypeId || null,
           teamcityBuildId: buildId,
@@ -209,6 +211,7 @@ export async function syncOteTcCreationRow(config, user, row) {
   const db = getDb()
   const now = new Date()
   const buildId = row.teamcityBuildId ? String(row.teamcityBuildId).trim() : ''
+  const auditActs = oteTcJobAuditActions(row.presetId)
   if (!buildId) {
     return rowToPublic(row)
   }
@@ -232,11 +235,12 @@ export async function syncOteTcCreationRow(config, user, row) {
     if (updated) {
       await recordAuditEvent(
         auditPayloadFromUser(user, {
-          actionCode: AUDIT_ACTION.OTE_CREATE_TC_FAILED,
+          actionCode: auditActs.failed,
           oteResourceId: `tc-creation:${row.id}`,
           oteTag: tagHint,
           details: {
             creationId: row.id,
+            presetId: row.presetId || null,
             reason: 'no_teamcity_authorization',
             teamcityBuildId: buildId,
             teamcityWebUrl: row.teamcityWebUrl || null,
@@ -284,11 +288,12 @@ export async function syncOteTcCreationRow(config, user, row) {
     if (updated) {
       await recordAuditEvent(
         auditPayloadFromUser(user, {
-          actionCode: AUDIT_ACTION.OTE_CREATE_TC_FAILED,
+          actionCode: auditActs.failed,
           oteResourceId: `tc-creation:${row.id}`,
           oteTag: tagHint,
           details: {
             creationId: row.id,
+            presetId: row.presetId || null,
             teamcityBuildId: buildId,
             teamcityWebUrl: row.teamcityWebUrl || null,
             state: snap.state,
@@ -317,11 +322,12 @@ export async function syncOteTcCreationRow(config, user, row) {
     if (updated) {
       await recordAuditEvent(
         auditPayloadFromUser(user, {
-          actionCode: AUDIT_ACTION.OTE_CREATE_TC_FAILED,
+          actionCode: auditActs.failed,
           oteResourceId: `tc-creation:${row.id}`,
           oteTag: tagHint,
           details: {
             creationId: row.id,
+            presetId: row.presetId || null,
             teamcityBuildId: buildId,
             teamcityWebUrl: row.teamcityWebUrl || null,
             reason: 'resulting_properties_unavailable',
@@ -358,11 +364,12 @@ export async function syncOteTcCreationRow(config, user, row) {
   if (updated) {
     await recordAuditEvent(
       auditPayloadFromUser(user, {
-        actionCode: AUDIT_ACTION.OTE_CREATE_TC_SUCCEEDED,
+        actionCode: auditActs.succeeded,
         oteResourceId: `tc-creation:${row.id}`,
         oteTag: metadataTag,
         details: {
           creationId: row.id,
+          presetId: row.presetId || null,
           teamcityBuildId: buildId,
           teamcityWebUrl: row.teamcityWebUrl || null,
           caseoneVersion,
