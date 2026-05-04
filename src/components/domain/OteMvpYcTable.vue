@@ -77,7 +77,7 @@
                   :to="`/create/requests/${row.oteTcCreationBlocking.id}`"
                   class="text-[10px] font-bold uppercase tracking-wide text-brand underline decoration-brand/30 underline-offset-2"
                 >
-                  Запрос создания · логи
+                  Запрос · логи TeamCity
                 </NuxtLink>
               </div>
             </td>
@@ -225,9 +225,13 @@ function go(id) {
 /**
  * Старт (TeamCity): есть хотя бы одна остановленная ВМ в группе.
  */
+const OTE_UPDATE_PRESET = 'build-template-update'
+
 function oteCreationBlockingHint(b) {
   if (!b?.id) return ''
-  return `Создание OTE ещё идёт (запрос #${b.id}). Действия с ВМ заблокированы до завершения сборки TeamCity.`
+  const upd = String(b?.presetId || '') === OTE_UPDATE_PRESET
+  const kind = upd ? 'Обновление' : 'Создание'
+  return `${kind} OTE ещё идёт (запрос #${b.id}). Действия с ВМ заблокированы до завершения сборки TeamCity.`
 }
 
 function rowCanStart(row) {

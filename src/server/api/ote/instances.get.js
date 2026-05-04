@@ -67,6 +67,7 @@ export default defineEventHandler(async (event) => {
       item.oteTcCreationBlocking = hit
         ? {
             id: hit.id,
+            presetId: hit.presetId,
             teamcityBuildId: hit.teamcityBuildId,
             teamcityWebUrl: hit.teamcityWebUrl,
           }
