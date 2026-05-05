@@ -1,11 +1,12 @@
-# CI: тесты и production-сборка на каждый PR и пуш в main.
+# CI: тесты и production-сборка на push/PR и вручную (Actions → CI → Run workflow).
 name: CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main, master]
+    branches: [main, master, develop]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, develop]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -41,3 +42,6 @@ jobs:
           # Минимум для прохождения сборки Nitro без локального .env
           NUXT_SESSION_SECRET: ci-build-placeholder-secret-min-32-chars-xx
           NUXT_PUBLIC_SITE_URL: https://example.invalid
+
+      - name: Integration tests (Nitro HTTP)
+        run: npm run test:integration

@@ -5,6 +5,7 @@ import { oteBuildTemplates, oteTcCreations } from '../db/schema.js'
 import { auditPayloadFromUser, recordAuditEvent } from './audit-log.js'
 import { mergeBuildTemplateOverrides, parseBuildTemplateParams } from './build-template-params.js'
 import { renderYamlPercentPlaceholders } from './build-template-render.js'
+import { assertValidYamlString } from './deployment-template-yaml.js'
 import { integrationUserKey } from './integrations/user-credentials.js'
 import { oteTcJobAuditActions } from './ote-tc-job-audit.js'
 import { queueTeamCityBuild } from './teamcity/client.js'
@@ -20,11 +21,14 @@ import { resolveTeamCityAuthorizationHeader } from './teamcity/resolve-auth.js'
  *   buildTemplateId: number,
  *   mergedParams: Record<string, string>,
  *   presetId: string,
+ *   renderedYamlOverride?: string | null,
  * }} opts
  * @returns {Promise<{ created: typeof oteTcCreations.$inferSelect, tc: { buildId?: string, webUrl?: string, href?: string } }>}
  */
+const MAX_RENDERED_YAML_CHARS = 2 * 1024 * 1024
+
 export async function queueOteTcJobFromBuildTemplate(opts) {
-  const { user, config, buildTemplateId, mergedParams, presetId } = opts
+  const { user, config, buildTemplateId, mergedParams, presetId, renderedYamlOverride } = opts
   const db = getDb()
   const userKey = integrationUserKey(user)
   const rows = await db.select().from(oteBuildTemplates).where(eq(oteBuildTemplates.id, buildTemplateId)).limit(1)
@@ -37,10 +41,22 @@ export async function queueOteTcJobFromBuildTemplate(opts) {
   }
 
   let renderedYaml = ''
-  try {
-    renderedYaml = renderYamlPercentPlaceholders(String(tpl.yamlBody || ''), mergedParams)
-  } catch (e) {
-    throw createError({ statusCode: 400, message: e?.message || String(e) })
+  const overrideRaw = renderedYamlOverride != null ? String(renderedYamlOverride) : ''
+  if (overrideRaw.trim()) {
+    if (overrideRaw.length > MAX_RENDERED_YAML_CHARS) {
+      throw createError({ statusCode: 400, message: 'YAML слишком длинный' })
+    }
+    try {
+      renderedYaml = assertValidYamlString(overrideRaw)
+    } catch (e) {
+      throw createError({ statusCode: 400, message: e?.message || String(e) })
+    }
+  } else {
+    try {
+      renderedYaml = renderYamlPercentPlaceholders(String(tpl.yamlBody || ''), mergedParams)
+    } catch (e) {
+      throw createError({ statusCode: 400, message: e?.message || String(e) })
+    }
   }
 
   /** @type {Record<string, string>} */

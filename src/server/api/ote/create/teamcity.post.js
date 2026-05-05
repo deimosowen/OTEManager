@@ -10,7 +10,9 @@ import { isTeamCityAuthAvailable } from '../../../utils/teamcity/resolve-auth.js
 
 /**
  * Поставить сборку создания OTE в TeamCity и сохранить запись в `ote_tc_creations`.
- * Тело: `{ buildTemplateId, overrides? }`.
+ * Тело: `{ buildTemplateId, overrides?, renderedYaml? }`.
+ * Если задан непустой `renderedYaml` (валидный YAML), он уходит в TeamCity как `default_deploymet_config_template`
+ * и сохраняется в `ote_tc_creations.request_rendered_yaml` вместо подстановки из шаблона.
  */
 export default defineEventHandler(async (event) => {
   const user = requireOteUser(event)
@@ -39,12 +41,16 @@ export default defineEventHandler(async (event) => {
 
   const merged = mergeParamsFromTemplateAndOverrides(tpl.paramsJson, body?.overrides)
 
+  const renderedYamlOverride =
+    body && typeof body.renderedYaml === 'string' && body.renderedYaml.trim() ? body.renderedYaml : null
+
   const { created } = await queueOteTcJobFromBuildTemplate({
     user,
     config,
     buildTemplateId,
     mergedParams: merged,
     presetId: OTE_TC_PRESET_BUILD_TEMPLATE,
+    renderedYamlOverride,
   })
 
   return { creation: rowToPublic(created) }

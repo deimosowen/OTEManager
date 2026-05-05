@@ -6,17 +6,23 @@ const constantsDir = fileURLToPath(new URL('./src/constants', import.meta.url))
 
 /**
  * Vitest без полного Nuxt-рантайма: алиасы как в приложении (`~/` → `src/`).
- * Подходит для чистых функций, Pinia-сторов и будущих тестов с @vue/test-utils.
+ * Серверные утилиты без БД/HTTP тестируются как чистые функции; интеграции — по мере необходимости.
  */
 export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
     include: ['tests/**/*.{test,spec}.js'],
+    exclude: ['tests/integration/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/utils/**', 'src/stores/**', 'src/constants/**'],
+      include: [
+        'src/utils/**',
+        'src/stores/**',
+        'src/constants/**',
+        'src/server/utils/**/*.js',
+      ],
     },
   },
   resolve: {
