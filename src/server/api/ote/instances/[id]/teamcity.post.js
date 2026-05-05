@@ -1,4 +1,5 @@
 import { AUDIT_ACTION } from '@app-constants/audit.js'
+import { daysLifeFromTodayUtc } from '../../../../utils/teamcity/delete-date-days.js'
 import { getDb } from '../../../../db/client.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../../utils/audit-log.js'
 import { assertMetadataTagNotBlockedByOteCreation } from '../../../../utils/ote-tc-creation-guard.js'
@@ -15,8 +16,9 @@ import { createYandexCloudSession } from '../../../../utils/yc/session.js'
 import { listMemberInstancesForOteId } from '../../../../utils/yc/ote-members.js'
 
 /**
- * Поставить в TeamCity сборку Start/Stop/Delete по тегу OTE.
- * Тело: `{ "action": "start" | "stop" | "delete" }` — параметр сборки `metadata.tag` берётся из меток ВМ.
+ * Поставить в TeamCity сборку по тегу OTE: старт, стоп, удаление или смена даты автоудаления.
+ * Тело: `{ "action": "start" | "stop" | "delete" | "modify_delete_date", "deleteDate"?: "YYYY-MM-DD" }`.
+ * Для `modify_delete_date`: `deleteDate` строго после сегодня (UTC); в TC передаются `metadata.tag` и `days_life`.
  */
 export default defineEventHandler(async (event) => {
   const user = requireOteUser(event)
@@ -26,8 +28,13 @@ export default defineEventHandler(async (event) => {
   }
   const body = await readBody(event)
   const action = body && typeof body.action === 'string' ? body.action.toLowerCase() : ''
-  if (action !== 'start' && action !== 'stop' && action !== 'delete') {
-    throw createError({ statusCode: 400, message: 'Ожидается action: start, stop или delete' })
+  const deleteDateYmd =
+    action === 'modify_delete_date' && body && typeof body.deleteDate === 'string' ? body.deleteDate.trim() : ''
+  if (action !== 'start' && action !== 'stop' && action !== 'delete' && action !== 'modify_delete_date') {
+    throw createError({ statusCode: 400, message: 'Ожидается action: start, stop, delete или modify_delete_date' })
+  }
+  if (action === 'modify_delete_date' && !deleteDateYmd) {
+    throw createError({ statusCode: 400, message: 'Укажите deleteDate в формате YYYY-MM-DD' })
   }
 
   const config = useRuntimeConfig(event)
@@ -67,7 +74,7 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 409,
       message:
-        'Для этой OTE уже запущена операция TeamCity (запуск, остановка или удаление). Дождитесь завершения сборки или истечёт время ожидания.',
+        'Для этой OTE уже запущена операция TeamCity (запуск, остановка, удаление или изменение даты удаления). Дождитесь завершения сборки или истечёт время ожидания.',
       data: { current: existing },
     })
   }
@@ -82,12 +89,25 @@ export default defineEventHandler(async (event) => {
 
   await assertMetadataTagNotBlockedByOteCreation(db, metadataTag)
 
+  let daysLife = 0
+  if (action === 'modify_delete_date') {
+    daysLife = daysLifeFromTodayUtc(deleteDateYmd)
+    if (!Number.isFinite(daysLife) || daysLife < 1) {
+      throw createError({
+        statusCode: 400,
+        message: 'Дата автоудаления должна быть позже сегодняшнего дня (проверьте формат YYYY-MM-DD)',
+      })
+    }
+  }
+
   const buildTypeId =
     action === 'start'
       ? g.startBuildTypeId
       : action === 'stop'
         ? g.stopBuildTypeId
-        : g.deleteBuildTypeId
+        : action === 'modify_delete_date'
+          ? g.modifyDeleteDateBuildTypeId
+          : g.deleteBuildTypeId
   if (!buildTypeId) {
     throw createError({ statusCode: 503, message: 'Для вашей группы не задан buildTypeId для этой операции в настройках.' })
   }
@@ -98,6 +118,9 @@ export default defineEventHandler(async (event) => {
     if (action === 'delete') {
       properties['delete.exact_match'] = 'true'
     }
+    if (action === 'modify_delete_date') {
+      properties.days_life = String(daysLife)
+    }
     const tc = await queueTeamCityBuild({
       config,
       baseUrl: tcBase,
@@ -106,19 +129,26 @@ export default defineEventHandler(async (event) => {
       authorization,
     })
     const tcAuthUserKey = integrationUserKey(user)
-    markTcPending(id, { action, buildId: tc.buildId, tcAuthUserKey, tcRestBaseUrl: tcBase })
+    const pendingAction = action === 'modify_delete_date' ? 'modify_delete_date' : action
+    markTcPending(id, { action: pendingAction, buildId: tc.buildId, tcAuthUserKey, tcRestBaseUrl: tcBase })
     const auditAction =
       action === 'start'
         ? AUDIT_ACTION.OTE_TC_START
         : action === 'stop'
           ? AUDIT_ACTION.OTE_TC_STOP
-          : AUDIT_ACTION.OTE_TC_DELETE
+          : action === 'modify_delete_date'
+            ? AUDIT_ACTION.OTE_TC_MODIFY_DELETE_DATE
+            : AUDIT_ACTION.OTE_TC_DELETE
     await recordAuditEvent(
       auditPayloadFromUser(user, {
         actionCode: auditAction,
         oteResourceId: id,
         oteTag: metadataTag,
-        details: { teamCityBuildId: tc.buildId || null, buildTypeId },
+        details: {
+          teamCityBuildId: tc.buildId || null,
+          buildTypeId,
+          ...(action === 'modify_delete_date' ? { deleteDate: deleteDateYmd, daysLife } : {}),
+        },
       }),
     )
     return {

@@ -171,6 +171,7 @@ export const oteGroupTeamcitySettings = sqliteTable('ote_group_teamcity_settings
   startBuildTypeId: text('start_build_type_id', { length: 512 }).notNull(),
   stopBuildTypeId: text('stop_build_type_id', { length: 512 }).notNull(),
   deleteBuildTypeId: text('delete_build_type_id', { length: 512 }).notNull(),
+  modifyDeleteDateBuildTypeId: text('modify_delete_date_build_type_id', { length: 512 }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
   updatedByUserKey: text('updated_by_user_key', { length: 256 }),
 })

@@ -134,6 +134,13 @@
       "when": 1778500000000,
       "tag": "0019_ote_group_yc_settings_drop_cloud_name",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1778600000000,
+      "tag": "0020_ote_group_tc_modify_delete_date",
+      "breakpoints": true
     }
   ]
 }

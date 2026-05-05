@@ -191,6 +191,13 @@
                     autocomplete="off"
                     class="build-field"
                   />
+                  <AppInput
+                    v-model="activeTcRow.settings.modifyDeleteDateBuildTypeId"
+                    label="Изменение даты удаления (buildTypeId)"
+                    placeholder="CasePro_UniversalDeploy_ModifyDateDelete"
+                    autocomplete="off"
+                    class="build-field"
+                  />
                 </div>
               </div>
 
@@ -331,6 +338,7 @@ function emptySettings() {
     startBuildTypeId: '',
     stopBuildTypeId: '',
     deleteBuildTypeId: '',
+    modifyDeleteDateBuildTypeId: '',
     ycFolderId: '',
   }
 }
@@ -346,6 +354,7 @@ function cloneFromApi(rows) {
       startBuildTypeId: String(r.settings?.startBuildTypeId || ''),
       stopBuildTypeId: String(r.settings?.stopBuildTypeId || ''),
       deleteBuildTypeId: String(r.settings?.deleteBuildTypeId || ''),
+      modifyDeleteDateBuildTypeId: String(r.settings?.modifyDeleteDateBuildTypeId || ''),
       ycFolderId: String(r.settings?.ycFolderId ?? ''),
     },
   }))
@@ -367,6 +376,7 @@ function toPayload(rows) {
     startBuildTypeId: r.settings.startBuildTypeId,
     stopBuildTypeId: r.settings.stopBuildTypeId,
     deleteBuildTypeId: r.settings.deleteBuildTypeId,
+    modifyDeleteDateBuildTypeId: r.settings.modifyDeleteDateBuildTypeId,
     ycFolderId: r.settings.ycFolderId,
   }))
 }

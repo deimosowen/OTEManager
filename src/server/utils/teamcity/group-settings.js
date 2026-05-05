@@ -26,6 +26,7 @@ export async function fetchTeamCityGroupSettingsByUserKey(db, userKey) {
       startBuildTypeId: oteGroupTeamcitySettings.startBuildTypeId,
       stopBuildTypeId: oteGroupTeamcitySettings.stopBuildTypeId,
       deleteBuildTypeId: oteGroupTeamcitySettings.deleteBuildTypeId,
+      modifyDeleteDateBuildTypeId: oteGroupTeamcitySettings.modifyDeleteDateBuildTypeId,
     })
     .from(oteDirectoryUsers)
     .innerJoin(oteGroupTeamcitySettings, eq(oteDirectoryUsers.groupId, oteGroupTeamcitySettings.groupId))
@@ -40,6 +41,7 @@ export async function fetchTeamCityGroupSettingsByUserKey(db, userKey) {
     startBuildTypeId: String(r.startBuildTypeId || '').trim(),
     stopBuildTypeId: String(r.stopBuildTypeId || '').trim(),
     deleteBuildTypeId: String(r.deleteBuildTypeId || '').trim(),
+    modifyDeleteDateBuildTypeId: String(r.modifyDeleteDateBuildTypeId || '').trim(),
   }
 }
 
@@ -60,6 +62,7 @@ export async function fetchTeamCityGroupSettingsByGroupId(db, groupId) {
     startBuildTypeId: String(r.startBuildTypeId || '').trim(),
     stopBuildTypeId: String(r.stopBuildTypeId || '').trim(),
     deleteBuildTypeId: String(r.deleteBuildTypeId || '').trim(),
+    modifyDeleteDateBuildTypeId: String(r.modifyDeleteDateBuildTypeId || '').trim(),
     updatedAt: r.updatedAt,
     updatedByUserKey: r.updatedByUserKey ? String(r.updatedByUserKey) : null,
   }
