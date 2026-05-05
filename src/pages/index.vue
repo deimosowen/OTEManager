@@ -131,7 +131,10 @@
                   aria-hidden="true"
                 />
                 <div class="min-w-0 flex-1">
-                  <p class="truncate font-extrabold text-slate-900">{{ displayOteName(row) }}</p>
+                  <p class="flex min-w-0 items-center gap-2 font-extrabold text-slate-900">
+                    <span class="truncate">{{ displayOteName(row) }}</span>
+                    <OteProtectedBadge v-if="row.protected" compact class="shrink-0" />
+                  </p>
                   <p class="mt-0.5 truncate text-xs font-medium text-slate-500">
                     <span v-if="row.oteName && row.oteName !== row.name" class="font-mono">{{ row.oteName }}</span>
                     <span v-if="row.versionBackend" class="text-slate-400"> · {{ row.versionBackend }}</span>
@@ -171,7 +174,12 @@
                     Стоп
                   </AppButton>
                   <AppButton
-                    v-if="row.status !== OTE_STATUS.DELETING && !row.tcOperationPending && !row.oteTcCreationBlocking"
+                    v-if="
+                      row.status !== OTE_STATUS.DELETING &&
+                      !row.tcOperationPending &&
+                      !row.oteTcCreationBlocking &&
+                      !row.protected
+                    "
                     size="sm"
                     variant="danger"
                     class="!px-2 !py-1 !text-[11px]"

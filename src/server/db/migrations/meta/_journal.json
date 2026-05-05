@@ -141,6 +141,20 @@
       "when": 1778600000000,
       "tag": "0020_ote_group_tc_modify_delete_date",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1778700000000,
+      "tag": "0021_ote_tc_operation_pending",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1778800000000,
+      "tag": "0022_ote_protected_resources",
+      "breakpoints": true
     }
   ]
 }

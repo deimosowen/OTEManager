@@ -12,6 +12,13 @@
     variant="seed"
     @confirm="confirmSeedDelete"
   />
+  <OteProtectConfirmModal
+    v-model="protectModalOpen"
+    :mode="protectModalMode"
+    :ote-label="displayTitle"
+    :confirm-loading="protectBusy"
+    @confirm="confirmProtectToggle"
+  />
 
   <Teleport to="body">
     <div
@@ -91,10 +98,25 @@
     </div>
   </Teleport>
 
-  <div v-if="env">
+  <section
+    v-if="detailCardLoading && !env"
+    class="rounded-2xl border border-slate-200 bg-white p-10 shadow-card"
+    aria-busy="true"
+    aria-label="Загрузка карточки окружения"
+  >
+    <div class="flex flex-col items-center justify-center gap-4 py-10">
+      <Loader2 class="size-10 animate-spin text-brand" aria-hidden="true" />
+      <p class="text-center text-sm font-semibold text-slate-600">Загружаем карточку OTE…</p>
+    </div>
+  </section>
+
+  <div v-else-if="env">
     <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0">
-        <h1 class="truncate text-[22px] font-extrabold text-slate-900">{{ displayTitle }}</h1>
+        <h1 class="flex min-w-0 flex-wrap items-center gap-2 text-[22px] font-extrabold text-slate-900">
+          <span class="truncate">{{ displayTitle }}</span>
+          <OteProtectedBadge v-if="isYc && env?.protected" />
+        </h1>
         <div class="mt-2 flex flex-wrap items-center gap-2 text-sm font-semibold">
           <span class="inline-flex items-center gap-2">
             <span
@@ -257,13 +279,27 @@
             Обновить OTE
           </AppButton>
           <AppButton
+            v-if="cardCanToggleProtect"
+            variant="secondary"
+            size="md"
+            :loading="protectBusy"
+            :title="env.protected ? 'Снять защиту и восстановить дату автоудаления (+7 дней UTC)' : 'Защитить OTE (дата удаления 31.12.2099, удаление заблокировано)'"
+            @click="openProtectModal(env.protected ? 'unprotect' : 'protect')"
+          >
+            <Shield v-if="!env.protected" class="size-3.5" />
+            <ShieldOff v-else class="size-3.5" />
+            {{ env.protected ? 'Снять защиту' : 'Защитить' }}
+          </AppButton>
+          <AppButton
             variant="danger"
             size="md"
             :disabled="
               env.status === OTE_STATUS.DELETING ||
               Boolean(env.tcOperationPending) ||
-              Boolean(env.oteTcCreationBlocking)
+              Boolean(env.oteTcCreationBlocking) ||
+              Boolean(env.protected)
             "
+            :title="env.protected ? 'Снимите защиту, чтобы удалить OTE' : ''"
             @click="deleteModalOpen = true"
           >
             <Trash2 class="size-3.5" />
@@ -691,7 +727,7 @@
   </div>
 
   <div v-else class="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-card">
-    <div class="text-sm font-semibold text-slate-600">Окружение не найдено</div>
+    <div class="text-sm font-semibold text-slate-600">Окружение не найдено или нет доступа</div>
     <div class="mt-4">
       <NuxtLink to="/environments" class="font-bold text-brand hover:underline">Вернуться к списку</NuxtLink>
     </div>
@@ -707,6 +743,8 @@ import {
   ExternalLink,
   Loader2,
   Play,
+  Shield,
+  ShieldOff,
   Square,
   Trash2,
   UserRound,
@@ -745,6 +783,14 @@ const modifyDeleteDateModalOpen = ref(false)
 const modifyDeleteDateDraft = ref('')
 const modifyDeleteBusy = ref(false)
 
+/** Первый запрос карточки по API ещё идёт (в store может не быть строки даже для существующей OTE). */
+const detailCardLoading = ref(true)
+
+const protectModalOpen = ref(false)
+/** @type {import('vue').Ref<'protect'|'unprotect'>} */
+const protectModalMode = ref('protect')
+const protectBusy = ref(false)
+
 function localIsoDatePlusDays(days) {
   const d = new Date()
   d.setHours(0, 0, 0, 0)
@@ -765,6 +811,41 @@ function openModifyDeleteDateModal() {
 function closeModifyDeleteDateModal() {
   if (modifyDeleteBusy.value) return
   modifyDeleteDateModalOpen.value = false
+}
+
+function openProtectModal(mode) {
+  protectModalMode.value = mode
+  protectModalOpen.value = true
+}
+
+async function confirmProtectToggle() {
+  const id = apiId.value
+  const e = env.value
+  if (!id || !e || protectBusy.value) return
+  const wantProtect = protectModalMode.value === 'protect'
+  protectBusy.value = true
+  try {
+    await $fetch(`/api/ote/instances/${encodeURIComponent(id)}/protected`, {
+      method: 'POST',
+      body: { confirm: true, protected: wantProtect },
+      credentials: 'include',
+    })
+    toast.show(wantProtect ? 'OTE защищена: дата удаления отправлена в TeamCity.' : 'Защита снята: дата удаления отправлена в TeamCity (+7 дней UTC).', 'success')
+    protectModalOpen.value = false
+    await loadDetail()
+    try {
+      await store.refreshFromYandexApi()
+    } catch {
+      /* ignore */
+    }
+    notifyOteInstancesRefresh()
+  } catch (err) {
+    const sc = err?.statusCode ?? err?.response?.status
+    const msg = err?.data?.message || err?.message || String(err)
+    toast.show(msg, sc === 409 || sc === 403 ? 'warn' : 'error')
+  } finally {
+    protectBusy.value = false
+  }
 }
 
 async function submitModifyDeleteDate() {
@@ -892,6 +973,7 @@ const ycCanModifyDeleteDate = computed(() => {
   if (e.status === OTE_STATUS.DELETING) return false
   if (e.tcOperationPending) return false
   if (e.oteTcCreationBlocking) return false
+  if (e.protected) return false
   return true
 })
 
@@ -901,6 +983,7 @@ const ycModifyDeleteDateDisabledTitle = computed(() => {
   if (e.status === OTE_STATUS.DELETING) return 'Окружение удаляется'
   if (e.tcOperationPending) return 'Дождитесь завершения операции TeamCity'
   if (e.oteTcCreationBlocking) return 'Уже идёт сборка по этой метке'
+  if (e.protected) return 'Для защищённой OTE дата удаления задаётся через действие «Защитить» / «Снять защиту»'
   return ''
 })
 
@@ -934,6 +1017,15 @@ const cardCanStop = computed(() => {
   const t = e.instances?.total
   const r = e.instances?.ready
   return typeof t === 'number' && t > 0 && typeof r === 'number' && r === t
+})
+
+const cardCanToggleProtect = computed(() => {
+  const e = env.value
+  if (!e || e.source !== 'yc') return false
+  if (e.status === OTE_STATUS.DELETING) return false
+  if (e.tcOperationPending) return false
+  if (e.oteTcCreationBlocking) return false
+  return true
 })
 
 const tcPendingDetailText = computed(() => {
@@ -1030,6 +1122,7 @@ watch(apiId, (id) => {
     oteAuditFilterAction.value = ''
     oteAuditFilterDateFrom.value = ''
     oteAuditFilterDateTo.value = ''
+    detailCardLoading.value = true
     void loadDetail()
   }
 })
@@ -1047,16 +1140,26 @@ onUnmounted(() => {
   clearDetailPoll()
 })
 
+let loadDetailSeq = 0
+
 async function loadDetail() {
   const id = apiId.value
-  if (!id) return
+  if (!id) {
+    detailCardLoading.value = false
+    return
+  }
+  const seq = ++loadDetailSeq
+  detailCardLoading.value = true
   try {
     const { item } = await $fetch(`/api/ote/instances/${encodeURIComponent(id)}`, { credentials: 'include' })
+    if (seq !== loadDetailSeq) return
     if (item) store.upsertItem(item)
   } catch {
-    /* данные из списка / мок */
+    /* данные из списка / мок; ошибка доступа см. финальную плашку «не найдено» */
+  } finally {
+    if (seq === loadDetailSeq) detailCardLoading.value = false
   }
-  void loadOteAudit()
+  if (seq === loadDetailSeq) void loadOteAudit()
 }
 
 async function loadOteAudit() {

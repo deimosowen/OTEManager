@@ -2,6 +2,7 @@ import { AUDIT_ACTION } from '@app-constants/audit.js'
 import { getDb } from '../../../../db/client.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../../utils/audit-log.js'
 import { assertMetadataTagNotBlockedByOteCreation } from '../../../../utils/ote-tc-creation-guard.js'
+import { isOteResourceProtected } from '../../../../utils/ote-protected.js'
 import { peekTcPending } from '../../../../utils/ote-tc-pending.js'
 import { requireOteUser } from '../../../../utils/require-ote-auth.js'
 import { requireYcFolderIdForUser } from '../../../../utils/yc/group-settings.js'
@@ -38,7 +39,15 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'ВМ не найдены' })
   }
 
-  const tcWait = peekTcPending(id)
+  if (await isOteResourceProtected(db, id)) {
+    throw createError({
+      statusCode: 403,
+      message:
+        'Защищённую OTE нельзя удалить. Снимите флаг «Защищённая» на странице окружения — после этого удаление снова станет доступно.',
+    })
+  }
+
+  const tcWait = await peekTcPending(id)
   if (tcWait) {
     throw createError({
       statusCode: 409,
