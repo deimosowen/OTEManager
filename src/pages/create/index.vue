@@ -277,16 +277,41 @@
               </ul>
             </div>
 
-            <p v-if="yamlPreviewError" class="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
+            <p v-if="!yamlIsManual && yamlPreviewError" class="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800">
               {{ yamlPreviewError }}
+            </p>
+            <p
+              v-else-if="yamlIsManual"
+              class="rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs font-semibold text-amber-950"
+            >
+              Редактирование YAML вручную: поля параметров сами по себе текст ниже не обновляют. Чтобы снова подставить
+              YAML из шаблона и параметров, нажмите «Подставить из параметров».
             </p>
 
             <details v-if="currentTemplate" class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
               <summary class="cursor-pointer text-sm font-extrabold text-slate-800 [&::-webkit-details-marker]:hidden">
-                YAML предпросмотр
+                YAML (предпросмотр и правки)
               </summary>
+              <p class="mt-2 text-xs font-medium leading-relaxed text-slate-600">
+                Отредактированный текст уходит в TeamCity и сохраняется в запросе создания; синтаксис YAML проверяется на
+                сервере.
+              </p>
+              <div class="mt-2 flex flex-wrap justify-end">
+                <button
+                  type="button"
+                  class="text-xs font-extrabold text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand"
+                  @click="resetYamlFromParams"
+                >
+                  Подставить из параметров
+                </button>
+              </div>
               <div class="mt-3">
-                <AppTextareaWithLineNumbers :model-value="yamlPreview" :spellcheck="false" min-height-class="min-h-[320px]" />
+                <AppTextareaWithLineNumbers
+                  :model-value="yamlDraft"
+                  :spellcheck="false"
+                  min-height-class="min-h-[320px]"
+                  @update:modelValue="onYamlDraftUpdate"
+                />
               </div>
             </details>
           </div>
@@ -527,6 +552,7 @@ watch(
 )
 
 watch(selectedTemplateId, (id) => {
+  yamlIsManual.value = false
   if (skipRecentRecord.value || !id) return
   recordRecent(String(id))
 })
@@ -589,7 +615,7 @@ const yamlPreviewError = computed(() => {
   return `Не заданы параметры для YAML: ${missing.slice(0, 12).join(', ')}${missing.length > 12 ? ` (+${missing.length - 12})` : ''}`
 })
 
-const yamlPreview = computed(() => {
+const yamlAutoRendered = computed(() => {
   const t = currentTemplateFull.value
   if (!t) return ''
   const y = String(t.yaml || '')
@@ -598,6 +624,27 @@ const yamlPreview = computed(() => {
     return overrides.value[k] != null ? String(overrides.value[k]) : ''
   })
 })
+
+const yamlDraft = ref('')
+const yamlIsManual = ref(false)
+
+watch(
+  yamlAutoRendered,
+  (y) => {
+    if (!yamlIsManual.value) yamlDraft.value = y
+  },
+  { immediate: true },
+)
+
+function onYamlDraftUpdate(v) {
+  yamlDraft.value = v
+  yamlIsManual.value = true
+}
+
+function resetYamlFromParams() {
+  yamlIsManual.value = false
+  yamlDraft.value = yamlAutoRendered.value
+}
 
 async function loadAll() {
   skipRecentRecord.value = true
@@ -669,10 +716,15 @@ async function submitCreate() {
   if (!t) return
   submitting.value = true
   try {
+    const yamlOut = String(yamlDraft.value || '').trim()
     const res = await $fetch('/api/ote/create/teamcity', {
       method: 'POST',
       credentials: 'include',
-      body: { buildTemplateId: Number(t.id), overrides: overrides.value },
+      body: {
+        buildTemplateId: Number(t.id),
+        overrides: overrides.value,
+        ...(yamlOut ? { renderedYaml: yamlDraft.value } : {}),
+      },
     })
     const c = res?.creation
     if (!c?.id) {
