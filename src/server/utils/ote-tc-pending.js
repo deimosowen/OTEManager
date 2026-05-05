@@ -12,7 +12,7 @@ import { mapYcInstanceStatusToOte } from './yc/compute.js'
  * - или вызван clearTcPending / API сброса.
  */
 
-/** @type {Map<string, { action: 'start'|'stop'|'delete', queuedAt: string, buildId: string, expiresAt: number, tcAuthUserKey: string, tcRestBaseUrl: string }>} */
+/** @type {Map<string, { action: 'start'|'stop'|'delete'|'modify_delete_date', queuedAt: string, buildId: string, expiresAt: number, tcAuthUserKey: string, tcRestBaseUrl: string }>} */
 const pendingByOteId = new Map()
 
 /** 25 мин — запас на длинные сборки/прогрев ВМ */
@@ -38,7 +38,7 @@ export function peekTcPending(oteId) {
 
 /**
  * @param {string} oteId
- * @param {{ action: 'start'|'stop'|'delete', buildId?: string, tcAuthUserKey?: string, tcRestBaseUrl?: string }} rec
+ * @param {{ action: 'start'|'stop'|'delete'|'modify_delete_date', buildId?: string, tcAuthUserKey?: string, tcRestBaseUrl?: string }} rec
  */
 export function markTcPending(oteId, rec) {
   const now = Date.now()
@@ -76,7 +76,7 @@ function countRunning(members) {
  * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[]} members
  * @param {import('@nuxt/schema').NitroRuntimeConfig | undefined} config
  * @returns {Promise<{
- *   action: 'start'|'stop'|'delete',
+ *   action: 'start'|'stop'|'delete'|'modify_delete_date',
  *   queuedAt: string,
  *   buildId?: string,
  *   progress: { running: number, total: number },

@@ -74,6 +74,7 @@ export async function seedIntegrationDatabase(dbFilePath, sessionSecret, options
       startBuildTypeId: 'Integration_Start_BT',
       stopBuildTypeId: 'Integration_Stop_BT',
       deleteBuildTypeId: 'Integration_Delete_BT',
+      modifyDeleteDateBuildTypeId: 'CasePro_UniversalDeploy_ModifyDateDelete',
       updatedAt: now,
       updatedByUserKey: userKey,
     })

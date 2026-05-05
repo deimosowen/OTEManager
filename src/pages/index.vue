@@ -221,7 +221,7 @@
                     ? 'Идёт обновление OTE'
                     : 'Идёт создание OTE'
                 }}
-                (запрос #{{ row.oteTcCreationBlocking.id }}). Старт, стоп и удаление недоступны.
+                (запрос #{{ row.oteTcCreationBlocking.id }}). Старт, стоп, удаление и изменение даты удаления недоступны.
                 <NuxtLink
                   :to="`/create/requests/${row.oteTcCreationBlocking.id}`"
                   class="ml-1 font-bold text-brand underline decoration-brand/30 underline-offset-2"

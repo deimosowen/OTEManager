@@ -35,12 +35,13 @@ export default defineEventHandler(async (event) => {
     const startBuildTypeId = String(it?.startBuildTypeId ?? '').trim().slice(0, 512)
     const stopBuildTypeId = String(it?.stopBuildTypeId ?? '').trim().slice(0, 512)
     const deleteBuildTypeId = String(it?.deleteBuildTypeId ?? '').trim().slice(0, 512)
+    const modifyDeleteDateBuildTypeId = String(it?.modifyDeleteDateBuildTypeId ?? '').trim().slice(0, 512)
 
     if (!tcRestBaseUrl || !tcUiBaseUrl) {
       throw createError({ statusCode: 400, message: `Группа ${gid}: укажите REST и UI URL TeamCity` })
     }
-    if (!startBuildTypeId || !stopBuildTypeId || !deleteBuildTypeId) {
-      throw createError({ statusCode: 400, message: `Группа ${gid}: укажите все три buildTypeId` })
+    if (!startBuildTypeId || !stopBuildTypeId || !deleteBuildTypeId || !modifyDeleteDateBuildTypeId) {
+      throw createError({ statusCode: 400, message: `Группа ${gid}: укажите все четыре buildTypeId (включая изменение даты удаления)` })
     }
 
     await db
@@ -51,6 +52,7 @@ export default defineEventHandler(async (event) => {
         startBuildTypeId,
         stopBuildTypeId,
         deleteBuildTypeId,
+        modifyDeleteDateBuildTypeId,
         updatedAt: now,
         updatedByUserKey: editorKey || null,
       })

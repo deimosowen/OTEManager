@@ -126,6 +126,9 @@ export async function createAppGroup(db, name) {
         startBuildTypeId: String(src.startBuildTypeId),
         stopBuildTypeId: String(src.stopBuildTypeId),
         deleteBuildTypeId: String(src.deleteBuildTypeId),
+        modifyDeleteDateBuildTypeId: String(
+          src.modifyDeleteDateBuildTypeId || 'CasePro_UniversalDeploy_ModifyDateDelete',
+        ),
         updatedAt: now,
         updatedByUserKey: null,
       })
@@ -137,6 +140,7 @@ export async function createAppGroup(db, name) {
         startBuildTypeId: 'CasePro_UniversalDeploy_StartByTag',
         stopBuildTypeId: 'CasePro_UniversalDeploy_StopByTag',
         deleteBuildTypeId: 'CasePro_UniversalDeploy_Delete',
+        modifyDeleteDateBuildTypeId: 'CasePro_UniversalDeploy_ModifyDateDelete',
         updatedAt: now,
         updatedByUserKey: null,
       })

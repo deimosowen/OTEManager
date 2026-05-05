@@ -57,6 +57,40 @@
     </div>
   </Teleport>
 
+  <Teleport to="body">
+    <div
+      v-if="modifyDeleteDateModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ote-modify-delete-date-title"
+    >
+      <div class="absolute inset-0 bg-slate-900/55 backdrop-blur-[2px]" aria-hidden="true" @click="closeModifyDeleteDateModal" />
+      <div
+        class="relative w-full max-w-[440px] overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl ring-1 ring-slate-900/5"
+        @click.stop
+      >
+        <div class="h-1 bg-gradient-to-r from-brand via-sky-500 to-sky-400" aria-hidden="true" />
+        <div class="p-6 sm:p-7">
+          <h2 id="ote-modify-delete-date-title" class="text-lg font-extrabold tracking-tight text-slate-900">Дата автоудаления</h2>
+          <p class="mt-2 text-sm font-medium leading-relaxed text-slate-600">
+            Можно выбрать только завтра или позже. Дата на карточке обновится, когда изменение применится в облаке.
+          </p>
+          <p class="mt-5 text-xs font-extrabold uppercase tracking-wide text-slate-500">Новая дата удаления</p>
+          <div class="mt-3">
+            <AppDateCalendar v-model="modifyDeleteDateDraft" :min="modifyDeleteDateMin" />
+          </div>
+          <div class="mt-7 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-5">
+            <AppButton variant="secondary" :disabled="modifyDeleteBusy" @click="closeModifyDeleteDateModal">Отмена</AppButton>
+            <AppButton variant="primary" :loading="modifyDeleteBusy" :disabled="!modifyDeleteDateDraft" @click="submitModifyDeleteDate">
+              Запустить
+            </AppButton>
+          </div>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
   <div v-if="env">
     <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
       <div class="min-w-0">
@@ -176,8 +210,18 @@
           <span v-else class="text-slate-400">Приложение: —</span>
         </div>
 
-        <div v-if="isYc && env.deleteDate" class="mt-2 text-sm font-semibold text-slate-600">
-          Автоудаление: <span class="font-mono text-slate-800">{{ env.deleteDate }}</span>
+        <div v-if="isYc" class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold text-slate-600">
+          <span>Автоудаление:</span>
+          <span class="font-mono text-slate-800">{{ env.deleteDate || '—' }}</span>
+          <button
+            type="button"
+            class="text-xs font-bold text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand disabled:cursor-not-allowed disabled:text-slate-400 disabled:no-underline"
+            :disabled="!ycCanModifyDeleteDate"
+            :title="ycModifyDeleteDateDisabledTitle"
+            @click="openModifyDeleteDateModal"
+          >
+            Изменить
+          </button>
         </div>
       </div>
 
@@ -697,6 +741,61 @@ const updateModalOpen = ref(false)
 const updateVersionDraft = ref('')
 const updateBusy = ref(false)
 
+const modifyDeleteDateModalOpen = ref(false)
+const modifyDeleteDateDraft = ref('')
+const modifyDeleteBusy = ref(false)
+
+function localIsoDatePlusDays(days) {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() + Number(days) || 0)
+  const y = d.getFullYear()
+  const mo = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${mo}-${day}`
+}
+
+const modifyDeleteDateMin = computed(() => localIsoDatePlusDays(1))
+
+function openModifyDeleteDateModal() {
+  modifyDeleteDateDraft.value = modifyDeleteDateMin.value
+  modifyDeleteDateModalOpen.value = true
+}
+
+function closeModifyDeleteDateModal() {
+  if (modifyDeleteBusy.value) return
+  modifyDeleteDateModalOpen.value = false
+}
+
+async function submitModifyDeleteDate() {
+  const id = apiId.value
+  const dateStr = String(modifyDeleteDateDraft.value || '').trim()
+  if (!id || !dateStr || modifyDeleteBusy.value) return
+  modifyDeleteBusy.value = true
+  try {
+    const res = await $fetch(`/api/ote/instances/${encodeURIComponent(id)}/teamcity`, {
+      method: 'POST',
+      body: { action: 'modify_delete_date', deleteDate: dateStr },
+      credentials: 'include',
+    })
+    const buildId = res?.teamCity?.buildId
+    toast.show(`Сборка изменения даты удаления в TeamCity поставлена в очередь${buildId ? ` (#${buildId})` : ''}.`, 'success')
+    modifyDeleteDateModalOpen.value = false
+    await loadDetail()
+    try {
+      await store.refreshFromYandexApi()
+    } catch {
+      /* ignore */
+    }
+    notifyOteInstancesRefresh()
+  } catch (err) {
+    const sc = err?.statusCode ?? err?.response?.status
+    toast.show(err?.data?.message || err?.message || String(err), sc === 409 ? 'warn' : 'error')
+  } finally {
+    modifyDeleteBusy.value = false
+  }
+}
+
 const OTE_UPDATE_PRESET = 'build-template-update'
 
 const oteAuditRows = ref([])
@@ -787,13 +886,31 @@ const ycOteUpdateDisabledTitle = computed(() => {
   return ''
 })
 
+const ycCanModifyDeleteDate = computed(() => {
+  const e = env.value
+  if (!e || e.source !== 'yc') return false
+  if (e.status === OTE_STATUS.DELETING) return false
+  if (e.tcOperationPending) return false
+  if (e.oteTcCreationBlocking) return false
+  return true
+})
+
+const ycModifyDeleteDateDisabledTitle = computed(() => {
+  const e = env.value
+  if (!e) return ''
+  if (e.status === OTE_STATUS.DELETING) return 'Окружение удаляется'
+  if (e.tcOperationPending) return 'Дождитесь завершения операции TeamCity'
+  if (e.oteTcCreationBlocking) return 'Уже идёт сборка по этой метке'
+  return ''
+})
+
 /** Те же правила, что в таблице списка (`OteMvpYcTable`). */
 const oteCreationBlockingCardText = computed(() => {
   const b = env.value?.oteTcCreationBlocking
   if (!b?.id) return ''
   const upd = String(b?.presetId || '') === OTE_UPDATE_PRESET
   const kind = upd ? 'обновление' : 'создание'
-  return `Для этой метки выполняется ${kind} OTE (запрос #${b.id}). Старт, стоп, удаление и повторное обновление недоступны, пока сборка в TeamCity не завершится успешно или с ошибкой.`
+  return `Для этой метки выполняется ${kind} OTE (запрос #${b.id}). Старт, стоп, удаление, изменение даты удаления и повторное обновление недоступны, пока сборка в TeamCity не завершится успешно или с ошибкой.`
 })
 
 const cardCanStart = computed(() => {
@@ -829,6 +946,9 @@ const tcPendingDetailText = computed(() => {
   }
   if (p.action === 'delete') {
     return `Идёт удаление через TeamCity: в каталоге ещё видно ${r} из ${t} ВМ. Блокировка снимется после завершения сборки в TeamCity; при зависании можно снять ожидание вручную.`
+  }
+  if (p.action === 'modify_delete_date') {
+    return `Идёт изменение даты автоудаления через TeamCity. Блокировка снимется после завершения сборки в TeamCity; при зависании можно снять ожидание вручную.`
   }
   return `Идёт остановка через TeamCity: работают ${r} из ${t} ВМ. Блокировка снимется после завершения сборки в TeamCity; при зависании можно снять ожидание вручную.`
 })
