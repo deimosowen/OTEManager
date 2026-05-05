@@ -25,9 +25,10 @@
             @click="go(row.id)"
           >
             <td class="px-4 py-3">
-              <div class="flex items-center gap-2 font-bold text-brand">
+              <div class="flex flex-wrap items-center gap-2 font-bold text-brand">
                 <Server class="size-4 shrink-0 text-slate-400" />
                 {{ row.name }}
+                <OteProtectedBadge v-if="row.protected" compact />
               </div>
             </td>
             <td class="px-4 py-3 text-sm">{{ row.product }}</td>

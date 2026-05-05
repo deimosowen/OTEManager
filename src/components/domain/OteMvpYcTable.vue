@@ -24,13 +24,16 @@
             class="border-b border-slate-200 transition last:border-b-0 hover:bg-slate-50/80"
           >
             <td class="px-4 py-3">
-              <NuxtLink
-                :to="`/environments/${row.id}`"
-                class="group flex items-center gap-2 font-extrabold text-brand hover:underline"
-              >
-                <Server class="size-4 shrink-0 text-slate-400 group-hover:text-brand" />
-                <span>{{ row.oteName || row.name }}</span>
-              </NuxtLink>
+              <div class="flex flex-wrap items-center gap-2">
+                <NuxtLink
+                  :to="`/environments/${row.id}`"
+                  class="group inline-flex items-center gap-2 font-extrabold text-brand hover:underline"
+                >
+                  <Server class="size-4 shrink-0 text-slate-400 group-hover:text-brand" />
+                  <span>{{ row.oteName || row.name }}</span>
+                </NuxtLink>
+                <OteProtectedBadge v-if="row.protected" />
+              </div>
             </td>
             <td class="px-4 py-3" @click.stop>
               <div v-if="row.runBy" class="flex items-center gap-2 text-sm font-semibold text-slate-800">
@@ -114,7 +117,12 @@
                   Стоп
                 </AppButton>
                 <AppButton
-                  v-if="row.status !== OTE_STATUS.DELETING && !row.tcOperationPending && !row.oteTcCreationBlocking"
+                  v-if="
+                    row.status !== OTE_STATUS.DELETING &&
+                    !row.tcOperationPending &&
+                    !row.oteTcCreationBlocking &&
+                    !row.protected
+                  "
                   size="sm"
                   variant="danger"
                   class="!px-2 !py-1 !text-[11px]"
@@ -286,6 +294,9 @@ function tcPendingHint(p) {
   }
   if (p.action === 'delete') {
     return `Удаление через TeamCity… ВМ в каталоге: ${r} из ${t}. Повторные действия недоступны, пока не завершится сборка в TeamCity.`
+  }
+  if (p.action === 'modify_delete_date') {
+    return 'Изменение даты автоудаления через TeamCity… Повторные действия недоступны, пока сборка не завершится.'
   }
   return `Остановка через TeamCity… ВМ в работе: ${r} из ${t}. Повторная остановка недоступна, пока не завершится сборка в TeamCity.`
 }

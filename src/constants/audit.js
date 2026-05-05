@@ -25,6 +25,10 @@ export const AUDIT_ACTION = {
   OTE_TC_STOP: 'ote_tc_stop',
   OTE_TC_DELETE: 'ote_tc_delete',
   OTE_TC_MODIFY_DELETE_DATE: 'ote_tc_modify_delete_date',
+  /** Включение защиты OTE (дата удаления в TC → 2099-12-31). */
+  OTE_PROTECT: 'ote_protect',
+  /** Снятие защиты (дата удаления в TC → +7 дней от сегодня UTC). */
+  OTE_UNPROTECT: 'ote_unprotect',
   OTE_QUEUE_DELETE: 'ote_queue_delete',
   OTE_POWER_START: 'ote_power_start',
   OTE_POWER_STOP: 'ote_power_stop',
@@ -54,6 +58,8 @@ export const AUDIT_ACTION_LABELS = {
   [AUDIT_ACTION.OTE_TC_STOP]: 'Остановка (TeamCity)',
   [AUDIT_ACTION.OTE_TC_DELETE]: 'Удаление (TeamCity)',
   [AUDIT_ACTION.OTE_TC_MODIFY_DELETE_DATE]: 'Изменение даты удаления (TeamCity)',
+  [AUDIT_ACTION.OTE_PROTECT]: 'OTE: защита (дата удаления далеко в будущем)',
+  [AUDIT_ACTION.OTE_UNPROTECT]: 'OTE: снятие защиты (восстановление даты удаления)',
   [AUDIT_ACTION.OTE_QUEUE_DELETE]: 'Удаление (очередь)',
   [AUDIT_ACTION.OTE_POWER_START]: 'Запуск ВМ (очередь)',
   [AUDIT_ACTION.OTE_POWER_STOP]: 'Остановка ВМ (очередь)',

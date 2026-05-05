@@ -11,6 +11,7 @@ import {
   instanceMatchesLabelFilter,
   listAllInstancesInFolder,
 } from '../../utils/yc/compute.js'
+import { fetchOteProtectedIdSet } from '../../utils/ote-protected.js'
 import { resolveTcPendingState } from '../../utils/ote-tc-pending.js'
 import { buildMvpOptsFromRuntimeConfig } from '../../utils/yc/mvp-from-config.js'
 import { listMemberInstancesForOteIdFromFolderInstances } from '../../utils/yc/ote-members.js'
@@ -67,6 +68,14 @@ export default defineEventHandler(async (event) => {
   } catch {
     blockingByTag = new Map()
   }
+
+  /** Защищённые в менеджере OTE по `ote_resource_id` (совпадает с `items[].id`). */
+  let protectedIds = /** @type {Set<string>} */ (new Set())
+  try {
+    protectedIds = await fetchOteProtectedIdSet(db, items.map((i) => i.id))
+  } catch {
+    protectedIds = new Set()
+  }
   const membersByItem = items.map((item) => listMemberInstancesForOteIdFromFolderInstances(all, item.id, config))
   await Promise.all(
     items.map(async (item, i) => {
@@ -83,6 +92,7 @@ export default defineEventHandler(async (event) => {
             teamcityWebUrl: hit.teamcityWebUrl,
           }
         : null
+      item.protected = Boolean(item.id && protectedIds.has(item.id))
     }),
   )
   const filtered = all.filter((i) => instanceMatchesLabelFilter(i, labelKey, labelValue))

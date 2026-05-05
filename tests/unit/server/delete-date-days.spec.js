@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { daysLifeFromTodayUtc } from '~/server/utils/teamcity/delete-date-days.js'
+import { daysLifeFromTodayUtc, utcCalendarDatePlusDaysFromToday } from '~/server/utils/teamcity/delete-date-days.js'
 
 describe('daysLifeFromTodayUtc', () => {
   afterEach(() => {
@@ -14,5 +14,19 @@ describe('daysLifeFromTodayUtc', () => {
 
   it('отклоняет неверный формат', () => {
     expect(Number.isNaN(daysLifeFromTodayUtc('10.04.2026'))).toBe(true)
+  })
+})
+
+describe('utcCalendarDatePlusDaysFromToday', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('+7 дней совпадает с daysLifeFromTodayUtc', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(Date.UTC(2026, 5, 1, 8, 0, 0)))
+    const ymd = utcCalendarDatePlusDaysFromToday(7)
+    expect(ymd).toBe('2026-06-08')
+    expect(daysLifeFromTodayUtc(ymd)).toBe(7)
   })
 })

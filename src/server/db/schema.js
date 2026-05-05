@@ -15,6 +15,13 @@ export const appMeta = sqliteTable('app_meta', {
  * Одна строка на OTE; TTL в `expires_at`. Общая БД даёт блокировку между рестартами и репликами,
  * если все процессы смотрят в один файл SQLite / LibSQL URL.
  */
+/** OTE, помеченные как защищённые (метаданные менеджера; удаление блокируется, дата удаления задаётся через TeamCity). */
+export const oteProtectedResources = sqliteTable('ote_protected_resources', {
+  oteResourceId: text('ote_resource_id', { length: 512 }).primaryKey(),
+  markedAt: integer('marked_at', { mode: 'timestamp_ms' }).notNull(),
+  markedByUserKey: text('marked_by_user_key', { length: 256 }).notNull(),
+})
+
 export const oteTcOperationPending = sqliteTable('ote_tc_operation_pending', {
   oteResourceId: text('ote_resource_id', { length: 512 }).primaryKey(),
   action: text('action', { length: 32 }).notNull(),

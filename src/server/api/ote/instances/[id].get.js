@@ -19,6 +19,7 @@ import {
 } from '../../../utils/yc/compute.js'
 import { findBlockingOteTcCreationForMetadataTag } from '../../../utils/ote-tc-creation-guard.js'
 import { fetchLatestSucceededOteTcCreationForMetadataTag } from '../../../utils/ote-tc-creation-latest-succeeded.js'
+import { isOteResourceProtected } from '../../../utils/ote-protected.js'
 import { resolveTcPendingState } from '../../../utils/ote-tc-pending.js'
 import { pickMetadataTagFromMembers } from '../../../utils/teamcity/metadata-tag.js'
 import { buildMvpOptsFromRuntimeConfig } from '../../../utils/yc/mvp-from-config.js'
@@ -113,6 +114,7 @@ export default defineEventHandler(async (event) => {
     } else {
       item.oteTcCreationSummary = null
     }
+    item.protected = await isOteResourceProtected(db, id)
     await attachOteTcUpdateViaManager(getDb(), item, metaTagGrp)
     return { item }
   }
@@ -163,6 +165,7 @@ export default defineEventHandler(async (event) => {
   } else {
     item.oteTcCreationSummary = null
   }
+  item.protected = await isOteResourceProtected(db, id)
   await attachOteTcUpdateViaManager(getDb(), item, metaTagVm)
   return { item }
 })

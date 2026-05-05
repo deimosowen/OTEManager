@@ -1,5 +1,5 @@
 import { AUDIT_ACTION } from '@app-constants/audit.js'
-import { daysLifeFromTodayUtc } from '../../../../utils/teamcity/delete-date-days.js'
+import { runTeamCityModifyDeleteDateBuild } from '../../../../utils/teamcity/modify-delete-date-build.js'
 import { getDb } from '../../../../db/client.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../../utils/audit-log.js'
 import { assertMetadataTagNotBlockedByOteCreation } from '../../../../utils/ote-tc-creation-guard.js'
@@ -9,6 +9,7 @@ import {
   reserveTcPendingSlot,
   updateTcPendingBuildId,
 } from '../../../../utils/ote-tc-pending.js'
+import { isOteResourceProtected } from '../../../../utils/ote-protected.js'
 import { requireOteUser } from '../../../../utils/require-ote-auth.js'
 import { integrationUserKey } from '../../../../utils/integrations/user-credentials.js'
 import { queueTeamCityBuild } from '../../../../utils/teamcity/client.js'
@@ -24,6 +25,8 @@ import { listMemberInstancesForOteId } from '../../../../utils/yc/ote-members.js
  * Поставить в TeamCity сборку по тегу OTE: старт, стоп, удаление или смена даты автоудаления.
  * Тело: `{ "action": "start" | "stop" | "delete" | "modify_delete_date", "deleteDate"?: "YYYY-MM-DD" }`.
  * Для `modify_delete_date`: `deleteDate` строго после сегодня (UTC); в TC передаются `metadata.tag` и `days_life`.
+ *
+ * Защищённую OTE нельзя удалить через это API и нельзя вручную менять дату удаления (`protected.post`).
  */
 export default defineEventHandler(async (event) => {
   const user = requireOteUser(event)
@@ -43,6 +46,46 @@ export default defineEventHandler(async (event) => {
   }
 
   const config = useRuntimeConfig(event)
+
+  const db = getDb()
+
+  const folderId = await requireYcFolderIdForUser(db, user)
+  const session = createYandexCloudSession(config)
+  if (!session) {
+    throw createError({ statusCode: 503, message: 'Не настроен ключ сервисного аккаунта YC' })
+  }
+
+  const labelKey =
+    runtimeConfigString(config.ycInstanceLabelKey, 'NUXT_YC_INSTANCE_LABEL_KEY') || 'metadata-tag'
+
+  if (action === 'modify_delete_date') {
+    if (await isOteResourceProtected(db, id)) {
+      throw createError({
+        statusCode: 403,
+        message:
+          'Для защищённой OTE нельзя менять дату автоудаления вручную. Снимите флаг «Защищённая» на странице окружения.',
+      })
+    }
+    const rc = await runTeamCityModifyDeleteDateBuild({
+      db,
+      config,
+      user,
+      folderId,
+      session,
+      labelKey,
+      oteResourceId: id,
+      deleteDateYmd,
+      auditActionCode: AUDIT_ACTION.OTE_TC_MODIFY_DELETE_DATE,
+    })
+    return {
+      ok: true,
+      action,
+      metadataTag: rc.metadataTag,
+      buildTypeId: rc.buildTypeId,
+      teamCity: rc.teamCity,
+    }
+  }
+
   if (!(await isTeamCityAuthAvailable(config, { user }))) {
     throw createError({
       statusCode: 503,
@@ -50,7 +93,6 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const db = getDb()
   const userKey = integrationUserKey(user)
   const g = await fetchTeamCityGroupSettingsByUserKey(db, userKey)
   if (!g?.tcRestBaseUrl) {
@@ -61,17 +103,17 @@ export default defineEventHandler(async (event) => {
   }
   const tcBase = g.tcRestBaseUrl
 
-  const folderId = await requireYcFolderIdForUser(db, user)
-  const session = createYandexCloudSession(config)
-  if (!session) {
-    throw createError({ statusCode: 503, message: 'Не настроен ключ сервисного аккаунта YC' })
-  }
-
-  const labelKey =
-    runtimeConfigString(config.ycInstanceLabelKey, 'NUXT_YC_INSTANCE_LABEL_KEY') || 'metadata-tag'
   const members = await listMemberInstancesForOteId(session, folderId, id, config)
   if (!members.length) {
     throw createError({ statusCode: 404, message: 'ВМ не найдены' })
+  }
+
+  if (action === 'delete' && (await isOteResourceProtected(db, id))) {
+    throw createError({
+      statusCode: 403,
+      message:
+        'Защищённую OTE нельзя удалить через TeamCity. Снимите флаг «Защищённая» на странице окружения — после этого удаление станет доступно.',
+    })
   }
 
   const existing = await peekTcPending(id)
@@ -94,25 +136,8 @@ export default defineEventHandler(async (event) => {
 
   await assertMetadataTagNotBlockedByOteCreation(db, metadataTag)
 
-  let daysLife = 0
-  if (action === 'modify_delete_date') {
-    daysLife = daysLifeFromTodayUtc(deleteDateYmd)
-    if (!Number.isFinite(daysLife) || daysLife < 1) {
-      throw createError({
-        statusCode: 400,
-        message: 'Дата автоудаления должна быть позже сегодняшнего дня (проверьте формат YYYY-MM-DD)',
-      })
-    }
-  }
-
   const buildTypeId =
-    action === 'start'
-      ? g.startBuildTypeId
-      : action === 'stop'
-        ? g.stopBuildTypeId
-        : action === 'modify_delete_date'
-          ? g.modifyDeleteDateBuildTypeId
-          : g.deleteBuildTypeId
+    action === 'start' ? g.startBuildTypeId : action === 'stop' ? g.stopBuildTypeId : g.deleteBuildTypeId
   if (!buildTypeId) {
     throw createError({ statusCode: 503, message: 'Для вашей группы не задан buildTypeId для этой операции в настройках.' })
   }
@@ -123,10 +148,8 @@ export default defineEventHandler(async (event) => {
     if (action === 'delete') {
       properties['delete.exact_match'] = 'true'
     }
-    if (action === 'modify_delete_date') {
-      properties.days_life = String(daysLife)
-    }
-    const pendingAction = action === 'modify_delete_date' ? 'modify_delete_date' : action
+
+    const pendingAction = action
     const tcAuthUserKey = integrationUserKey(user)
     const reserved = await reserveTcPendingSlot(id, {
       action: pendingAction,
@@ -161,9 +184,7 @@ export default defineEventHandler(async (event) => {
         ? AUDIT_ACTION.OTE_TC_START
         : action === 'stop'
           ? AUDIT_ACTION.OTE_TC_STOP
-          : action === 'modify_delete_date'
-            ? AUDIT_ACTION.OTE_TC_MODIFY_DELETE_DATE
-            : AUDIT_ACTION.OTE_TC_DELETE
+          : AUDIT_ACTION.OTE_TC_DELETE
     await recordAuditEvent(
       auditPayloadFromUser(user, {
         actionCode: auditAction,
@@ -172,7 +193,6 @@ export default defineEventHandler(async (event) => {
         details: {
           teamCityBuildId: tc.buildId || null,
           buildTypeId,
-          ...(action === 'modify_delete_date' ? { deleteDate: deleteDateYmd, daysLife } : {}),
         },
       }),
     )

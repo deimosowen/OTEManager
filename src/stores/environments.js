@@ -105,6 +105,7 @@ export const useEnvironmentsStore = defineStore('environments', {
             row.versionBackend,
             row.versionFrontend,
             row.appUrl,
+            row.protected ? 'protected защита' : '',
             linkBlob,
           ]
             .filter(Boolean)
