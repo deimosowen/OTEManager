@@ -10,6 +10,6 @@ export default defineEventHandler(async (event) => {
   if (!id) {
     throw createError({ statusCode: 400, message: 'Не указан id' })
   }
-  const had = clearTcPending(id)
+  const had = await clearTcPending(id)
   return { ok: true, cleared: had }
 })

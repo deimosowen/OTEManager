@@ -3,7 +3,12 @@ import { daysLifeFromTodayUtc } from '../../../../utils/teamcity/delete-date-day
 import { getDb } from '../../../../db/client.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../../utils/audit-log.js'
 import { assertMetadataTagNotBlockedByOteCreation } from '../../../../utils/ote-tc-creation-guard.js'
-import { markTcPending, peekTcPending } from '../../../../utils/ote-tc-pending.js'
+import {
+  clearTcPending,
+  peekTcPending,
+  reserveTcPendingSlot,
+  updateTcPendingBuildId,
+} from '../../../../utils/ote-tc-pending.js'
 import { requireOteUser } from '../../../../utils/require-ote-auth.js'
 import { integrationUserKey } from '../../../../utils/integrations/user-credentials.js'
 import { queueTeamCityBuild } from '../../../../utils/teamcity/client.js'
@@ -69,7 +74,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'ВМ не найдены' })
   }
 
-  const existing = peekTcPending(id)
+  const existing = await peekTcPending(id)
   if (existing) {
     throw createError({
       statusCode: 409,
@@ -121,16 +126,36 @@ export default defineEventHandler(async (event) => {
     if (action === 'modify_delete_date') {
       properties.days_life = String(daysLife)
     }
-    const tc = await queueTeamCityBuild({
-      config,
-      baseUrl: tcBase,
-      buildTypeId,
-      properties,
-      authorization,
-    })
-    const tcAuthUserKey = integrationUserKey(user)
     const pendingAction = action === 'modify_delete_date' ? 'modify_delete_date' : action
-    markTcPending(id, { action: pendingAction, buildId: tc.buildId, tcAuthUserKey, tcRestBaseUrl: tcBase })
+    const tcAuthUserKey = integrationUserKey(user)
+    const reserved = await reserveTcPendingSlot(id, {
+      action: pendingAction,
+      tcAuthUserKey,
+      tcRestBaseUrl: tcBase,
+    })
+    if (!reserved) {
+      const cur = await peekTcPending(id)
+      throw createError({
+        statusCode: 409,
+        message:
+          'Для этой OTE уже запущена операция TeamCity (запуск, остановка, удаление или изменение даты удаления). Дождитесь завершения сборки или истечёт время ожидания.',
+        data: { current: cur },
+      })
+    }
+    let tc
+    try {
+      tc = await queueTeamCityBuild({
+        config,
+        baseUrl: tcBase,
+        buildTypeId,
+        properties,
+        authorization,
+      })
+    } catch (queueErr) {
+      await clearTcPending(id)
+      throw queueErr
+    }
+    await updateTcPendingBuildId(id, { buildId: tc.buildId })
     const auditAction =
       action === 'start'
         ? AUDIT_ACTION.OTE_TC_START
@@ -159,6 +184,8 @@ export default defineEventHandler(async (event) => {
       teamCity: tc,
     }
   } catch (err) {
+    const code = typeof err?.statusCode === 'number' ? err.statusCode : undefined
+    if (code === 409) throw err
     const msg = err?.message || String(err)
     throw createError({ statusCode: 502, message: msg })
   }

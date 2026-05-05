@@ -11,6 +11,21 @@ export const appMeta = sqliteTable('app_meta', {
 })
 
 /**
+ * Ожидание завершения операции TeamCity по OTE (старт / стоп / удаление по тегу и т.д.).
+ * Одна строка на OTE; TTL в `expires_at`. Общая БД даёт блокировку между рестартами и репликами,
+ * если все процессы смотрят в один файл SQLite / LibSQL URL.
+ */
+export const oteTcOperationPending = sqliteTable('ote_tc_operation_pending', {
+  oteResourceId: text('ote_resource_id', { length: 512 }).primaryKey(),
+  action: text('action', { length: 32 }).notNull(),
+  queuedAt: integer('queued_at', { mode: 'timestamp_ms' }).notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  teamcityBuildId: text('teamcity_build_id', { length: 32 }),
+  tcAuthUserKey: text('tc_auth_user_key', { length: 256 }).notNull().default(''),
+  tcRestBaseUrl: text('tc_rest_base_url', { length: 2048 }).notNull().default(''),
+})
+
+/**
  * Журнал действий пользователей.
  * `action_code` — строковый код из `~/constants/audit.js` (без CHECK в SQL для расширяемости).
  * `occurred_at` — UTC в миллисекундах (Unix epoch ms).

@@ -39,7 +39,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, message: 'ВМ не найдены' })
   }
 
-  const tcWait = peekTcPending(id)
+  const tcWait = await peekTcPending(id)
   if (tcWait) {
     throw createError({
       statusCode: 409,
