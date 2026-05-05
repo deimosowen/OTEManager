@@ -29,6 +29,7 @@ Thumbs.db
 # Tests
 coverage/
 *.lcov
+tests/integration/.tmp/
 
 # IDE
 .idea/
