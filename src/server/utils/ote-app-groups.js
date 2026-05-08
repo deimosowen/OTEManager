@@ -228,6 +228,30 @@ export async function deleteAppGroup(db, id) {
  * @param {string} targetUserKey
  * @param {number} groupId
  */
+/** Группа каталога без настроек TeamCity (имя/id для аудита и приглашений). */
+export async function fetchCatalogGroupForUserKey(db, userKey) {
+  if (!userKey) return null
+  const rows = await db
+    .select({
+      id: oteAppGroups.id,
+      code: oteAppGroups.code,
+      name: oteAppGroups.name,
+      isSystem: oteAppGroups.isSystem,
+    })
+    .from(oteDirectoryUsers)
+    .innerJoin(oteAppGroups, eq(oteDirectoryUsers.groupId, oteAppGroups.id))
+    .where(eq(oteDirectoryUsers.userKey, userKey))
+    .limit(1)
+  const r = rows[0]
+  if (!r) return null
+  return {
+    id: Number(r.id),
+    code: String(r.code || ''),
+    name: String(r.name || ''),
+    isSystem: Boolean(Number(r.isSystem)),
+  }
+}
+
 export async function setUserGroupChecked(db, targetUserKey, groupId) {
   const gid = Number(groupId)
   if (!Number.isFinite(gid)) {

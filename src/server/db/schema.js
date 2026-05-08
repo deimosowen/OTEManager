@@ -246,6 +246,29 @@ export const oteDirectoryUsers = sqliteTable(
   }),
 )
 
+/** Одноразовые/многоразовые пригласительные ссылки в группу каталога (токен в URL, в БД — sha256). */
+export const oteGroupInvites = sqliteTable(
+  'ote_group_invites',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    tokenHash: text('token_hash', { length: 64 }).notNull(),
+    groupId: integer('group_id')
+      .notNull()
+      .references(() => oteAppGroups.id, { onDelete: 'restrict' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    maxUses: integer('max_uses').notNull().default(1),
+    useCount: integer('use_count').notNull().default(0),
+    createdByUserKey: text('created_by_user_key', { length: 256 }),
+    revoked: integer('revoked').notNull().default(0),
+  },
+  (t) => ({
+    tokenUq: unique('ote_group_invites_token_hash_uq').on(t.tokenHash),
+    groupIdx: index('ote_group_invites_group_id_idx').on(t.groupId),
+    expiresIdx: index('ote_group_invites_expires_idx').on(t.expiresAt),
+  }),
+)
+
 /** Назначенные роли пользователю. */
 export const oteUserRoleAssignments = sqliteTable(
   'ote_user_role_assignments',

@@ -144,7 +144,7 @@
         </div>
       </div>
 
-      <!-- Группы: одна компактная карточка -->
+      <!-- Группы -->
       <div v-show="tab === 'groups'" class="max-w-3xl">
         <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
           <div class="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/80 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3 sm:px-4">
@@ -189,15 +189,36 @@
                 </div>
                 <p class="truncate font-mono text-[10px] leading-tight text-slate-400">{{ g.code }}</p>
               </div>
-              <div v-if="!g.isSystem" class="flex shrink-0 flex-wrap gap-1.5">
-                <template v-if="editingGroupId === g.id">
-                  <AppButton size="sm" variant="secondary" class="!text-xs !px-2 !py-1" :disabled="renamingGroup" @click="cancelEditGroup">Отмена</AppButton>
-                  <AppButton size="sm" variant="primary" class="!text-xs !px-2 !py-1" :loading="renamingGroup" @click="saveGroupRename(g.id)">Сохранить</AppButton>
+              <div class="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                <p
+                  v-if="g.isSystem"
+                  class="max-w-[200px] text-right text-[11px] font-semibold leading-snug text-slate-400"
+                  title="Новые пользователи уже попадают в системную группу при первом входе"
+                >
+                  Приглашение не нужно
+                </p>
+                <template v-if="!g.isSystem">
+                  <AppButton
+                    size="sm"
+                    variant="ghost"
+                    class="!gap-1.5 !px-2 !py-1 !text-xs font-bold text-emerald-800 ring-1 ring-emerald-200/90 hover:bg-emerald-50 hover:ring-emerald-300"
+                    title="Создать одноразовую или ограниченную ссылку в эту группу"
+                    @click="openGroupInviteModal(g)"
+                  >
+                    <Link2 class="size-3.5 shrink-0 opacity-90" aria-hidden="true" />
+                    Пригласить
+                  </AppButton>
                 </template>
-                <template v-else>
-                  <AppButton size="sm" variant="secondary" class="!text-xs !px-2 !py-1" @click="startEditGroup(g)">Переименовать</AppButton>
-                  <AppButton size="sm" variant="danger" class="!text-xs !px-2 !py-1" @click="askDeleteGroup(g)">Удалить</AppButton>
-                </template>
+                <div v-if="!g.isSystem" class="flex flex-wrap justify-end gap-1.5">
+                  <template v-if="editingGroupId === g.id">
+                    <AppButton size="sm" variant="secondary" class="!text-xs !px-2 !py-1" :disabled="renamingGroup" @click="cancelEditGroup">Отмена</AppButton>
+                    <AppButton size="sm" variant="primary" class="!text-xs !px-2 !py-1" :loading="renamingGroup" @click="saveGroupRename(g.id)">Сохранить</AppButton>
+                  </template>
+                  <template v-else>
+                    <AppButton size="sm" variant="secondary" class="!text-xs !px-2 !py-1" @click="startEditGroup(g)">Переименовать</AppButton>
+                    <AppButton size="sm" variant="danger" class="!text-xs !px-2 !py-1" @click="askDeleteGroup(g)">Удалить</AppButton>
+                  </template>
+                </div>
               </div>
             </li>
           </ul>
@@ -286,6 +307,136 @@
       </div>
     </Teleport>
 
+    <!-- Модальное окно приглашения в группу -->
+    <Teleport to="body">
+      <div
+        v-if="inviteModalOpen && inviteModalGroup"
+        class="fixed inset-0 z-[228] flex items-end justify-center p-0 sm:items-center sm:p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="group-invite-modal-title"
+      >
+        <div class="absolute inset-0 bg-slate-900/55 backdrop-blur-[3px]" aria-hidden="true" @click="closeGroupInviteModal" />
+        <div
+          class="relative flex max-h-[min(92vh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl border border-slate-200/90 bg-white shadow-2xl sm:rounded-2xl"
+          @click.stop
+        >
+          <div class="h-1.5 shrink-0 bg-gradient-to-r from-emerald-500 via-brand to-violet-500" aria-hidden="true" />
+
+          <div class="flex items-start gap-4 border-b border-slate-100 px-5 pb-4 pt-5">
+            <div
+              class="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-100 text-emerald-800 shadow-inner shadow-emerald-900/10 ring-1 ring-emerald-200/80"
+              aria-hidden="true"
+            >
+              <Link2 class="size-6" :stroke-width="2.25" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <h2 id="group-invite-modal-title" class="text-lg font-extrabold tracking-tight text-slate-900">Приглашение по ссылке</h2>
+              <p class="mt-1 truncate text-sm font-bold text-brand">{{ inviteModalGroup.name }}</p>
+            </div>
+            <button
+              type="button"
+              class="rounded-xl p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              aria-label="Закрыть"
+              @click="closeGroupInviteModal"
+            >
+              <span class="sr-only">Закрыть</span>
+              <svg class="size-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+
+          <div class="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            <template v-if="inviteModalStep === 'form'">
+              <div class="space-y-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-3">
+                <p class="text-xs font-bold uppercase tracking-wide text-slate-500">Как это работает</p>
+                <ul class="space-y-1.5 text-sm font-semibold leading-snug text-slate-600">
+                  <li class="flex gap-2">
+                    <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden="true" />
+                    Человек открывает ссылку без входа; если не авторизован — входит через Яндекс.
+                  </li>
+                  <li class="flex gap-2">
+                    <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
+                    После первого сохранения в каталог автоматически назначается эта группа.
+                  </li>
+                  <li class="flex gap-2">
+                    <span class="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500/90" aria-hidden="true" />
+                    Один «вход по ссылке» при успешной смене группы считается в лимите; если уже в этой группе — расход не тратится.
+                  </li>
+                </ul>
+              </div>
+
+              <div class="mt-5 grid gap-4 sm:grid-cols-2">
+                <label class="block">
+                  <span class="mb-1 flex items-center justify-between gap-2">
+                    <span class="text-xs font-extrabold uppercase tracking-wide text-slate-500">Действует, дней</span>
+                    <span class="text-[11px] font-bold text-slate-400">1–365</span>
+                  </span>
+                  <input
+                    v-model.number="inviteExpiresDays"
+                    type="number"
+                    min="1"
+                    max="365"
+                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-center text-sm font-extrabold text-slate-900 outline-none ring-brand/20 transition focus:border-brand focus:ring-2"
+                  />
+                </label>
+                <label class="block">
+                  <span class="mb-1 flex items-center justify-between gap-2">
+                    <span class="text-xs font-extrabold uppercase tracking-wide text-slate-500">Лимит активаций</span>
+                    <span class="text-[11px] font-bold text-slate-400">сколько раз</span>
+                  </span>
+                  <input
+                    v-model.number="inviteMaxUses"
+                    type="number"
+                    min="1"
+                    max="5000"
+                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-center text-sm font-extrabold text-slate-900 outline-none ring-brand/20 transition focus:border-brand focus:ring-2"
+                  />
+                </label>
+              </div>
+            </template>
+
+            <template v-else-if="inviteModalStep === 'done' && inviteModalResult?.inviteUrl">
+              <div class="rounded-xl border border-emerald-200/70 bg-gradient-to-b from-emerald-50/80 to-white px-4 py-4">
+                <p class="text-center text-[11px] font-extrabold uppercase tracking-wide text-emerald-800">Готово</p>
+                <p class="mt-1 text-center text-sm font-semibold text-slate-700">
+                  До
+                  <span class="font-extrabold text-slate-900">{{ formatInviteExpires(inviteModalResult.expiresAt) }}</span>
+                  · активаций:
+                  <span class="font-extrabold text-slate-900">{{ inviteModalResult.maxUses }}</span>
+                </p>
+                <div class="mt-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-stretch">
+                  <input
+                    readonly
+                    :value="inviteModalResult.inviteUrl"
+                    class="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 font-mono text-[11px] font-semibold text-slate-800 shadow-inner"
+                    @focus="selectInviteUrlField"
+                  />
+                  <AppButton variant="primary" class="shrink-0 font-extrabold sm:px-5" @click="copyInviteModalUrl">Копировать</AppButton>
+                </div>
+                <p class="mt-3 text-center text-[11px] font-semibold leading-relaxed text-amber-900/90">
+                  Сохраните ссылку: полный токен показывается только здесь.
+                </p>
+              </div>
+            </template>
+          </div>
+
+          <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50/40 px-5 py-4">
+            <AppButton variant="secondary" :disabled="creatingInvite" @click="closeGroupInviteModal">Закрыть</AppButton>
+            <AppButton
+              v-if="inviteModalStep === 'form'"
+              variant="primary"
+              class="font-extrabold"
+              :loading="creatingInvite"
+              @click="createGroupInvite"
+            >
+              Создать ссылку
+            </AppButton>
+            <AppButton v-else variant="primary" class="font-extrabold" @click="resetGroupInviteModalForm">Новая ссылка</AppButton>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <OteDeleteConfirmModal
       v-model="deleteGroupOpen"
       dialog-title="Удалить группу?"
@@ -300,6 +451,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { $fetch } from 'ofetch'
+import { Link2 } from 'lucide-vue-next'
 import { ROLE_CODES } from '~/constants/rbac'
 import { useUserTimeFormat } from '~/composables/useUserTimeFormat'
 import OteDeleteConfirmModal from '~/components/domain/OteDeleteConfirmModal.vue'
@@ -373,6 +525,16 @@ const deleteGroupOpen = ref(false)
 const deleteGroupTarget = ref(/** @type {any | null} */ (null))
 const deletingGroup = ref(false)
 
+const inviteModalOpen = ref(false)
+const inviteModalGroup = ref(/** @type {any | null} */ (null))
+const inviteModalStep = ref(/** @type {'form' | 'done'} */ ('form'))
+const inviteExpiresDays = ref(7)
+const inviteMaxUses = ref(1)
+const creatingInvite = ref(false)
+const inviteModalResult = ref(
+  /** @type {{ inviteUrl?: string, expiresAt?: string, maxUses?: number, groupId?: number, groupName?: string } | null} */ (null),
+)
+
 const panelUser = computed(() => users.value.find((x) => x.userKey === panelUserKey.value) ?? null)
 
 const groupSelectOptions = computed(() =>
@@ -401,6 +563,91 @@ function membersCount(groupId) {
 /** Роли для таблицы: без базовой USER */
 function elevatedRoleCodes(u) {
   return (u.roleCodes || []).filter((c) => c !== ROLE_CODES.USER)
+}
+
+/** @param {FocusEvent & { target: HTMLElement | null }} ev */
+function selectInviteUrlField(ev) {
+  if (ev?.target instanceof HTMLInputElement) ev.target.select()
+}
+
+function formatInviteExpires(iso) {
+  if (!iso) return '—'
+  try {
+    return formatDateTimeSeconds(iso)
+  } catch {
+    return String(iso)
+  }
+}
+
+function openGroupInviteModal(g) {
+  if (!g || Number(g.isSystem)) return
+  inviteModalGroup.value = g
+  inviteModalStep.value = 'form'
+  inviteModalResult.value = null
+  inviteExpiresDays.value = 7
+  inviteMaxUses.value = 1
+  inviteModalOpen.value = true
+}
+
+function closeGroupInviteModal() {
+  inviteModalOpen.value = false
+  inviteModalGroup.value = null
+  inviteModalStep.value = 'form'
+  inviteModalResult.value = null
+}
+
+function resetGroupInviteModalForm() {
+  inviteModalStep.value = 'form'
+  inviteModalResult.value = null
+}
+
+async function createGroupInvite() {
+  const g = inviteModalGroup.value
+  const gid = Number(g?.id)
+  if (!Number.isFinite(gid) || Number(g?.isSystem)) return
+  creatingInvite.value = true
+  try {
+    const res = await $fetch('/api/admin/group-invites', {
+      method: 'POST',
+      body: {
+        groupId: gid,
+        expiresInDays: inviteExpiresDays.value,
+        maxUses: inviteMaxUses.value,
+      },
+      credentials: 'include',
+    })
+    inviteModalResult.value =
+      typeof res?.inviteUrl === 'string'
+        ? {
+            inviteUrl: res.inviteUrl,
+            expiresAt: res.expiresAt,
+            maxUses: Number(res.maxUses),
+            groupId: Number(res.groupId),
+            groupName: String(res.groupName || ''),
+          }
+        : null
+    inviteModalStep.value = 'done'
+    toast.show('Ссылка создана', 'success')
+  } catch (e) {
+    toast.show(e?.data?.message || e?.message || String(e), 'error')
+    inviteModalResult.value = null
+  } finally {
+    creatingInvite.value = false
+  }
+}
+
+async function copyInviteModalUrl() {
+  const u = inviteModalResult.value?.inviteUrl
+  if (!u || typeof navigator === 'undefined' || typeof navigator.clipboard?.writeText !== 'function') {
+    toast.show('Копирование в буфер недоступно в этом браузере', 'warn')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(u)
+    toast.show('Ссылка скопирована', 'success')
+  } catch {
+    toast.show('Не удалось скопировать', 'error')
+  }
 }
 
 function initialsFor(u) {
