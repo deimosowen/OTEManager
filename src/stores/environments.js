@@ -97,6 +97,11 @@ export const useEnvironmentsStore = defineStore('environments', {
             Array.isArray(row.appLinks) && row.appLinks.length
               ? row.appLinks.map((l) => [l.label, l.href].filter(Boolean).join(' ')).join(' ')
               : ''
+          const extraLabelBlob = Object.keys(row)
+            .filter((k) => k.startsWith('ycLbl_'))
+            .map((k) => row[k])
+            .filter((v) => v != null && String(v).trim() !== '')
+            .join(' ')
           const blob = [
             row.name,
             row.oteName,
@@ -105,6 +110,11 @@ export const useEnvironmentsStore = defineStore('environments', {
             row.versionBackend,
             row.versionFrontend,
             row.appUrl,
+            row.listTotalCores,
+            row.listTotalMemoryGb,
+            row.product,
+            row.type,
+            extraLabelBlob,
             row.protected ? 'protected защита' : '',
             linkBlob,
           ]

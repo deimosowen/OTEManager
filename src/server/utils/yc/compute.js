@@ -1,4 +1,5 @@
 import { instanceService, instance } from '@yandex-cloud/nodejs-sdk/compute-v1'
+import { OTE_YC_LABEL_EXTRA_COLUMNS } from '@app-constants/ote-list-columns.js'
 import { OTE_STATUS } from '@app-constants/ote.js'
 
 const S = instance.Instance_Status
@@ -189,6 +190,48 @@ function pickFirstLabelFromMembers(members, keys) {
 }
 
 /**
+ * При группировке нескольких ВМ: уникальные значения через « / », как в интерфейсе ожидания.
+ * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[]} members
+ * @param {string[]} keys — порядок проверки меток как в MVP
+ */
+function pickJoinedLabelsFromMembers(members, keys) {
+  if (!keys.length) return ''
+  const vals = new Set()
+  for (const m of preferAppMembersFirst(members)) {
+    const labels = m.labels || {}
+    let foundForVm = ''
+    for (const k of keys) {
+      const v = labels[k]
+      if (v !== undefined && v !== null && String(v).trim() !== '') {
+        foundForVm = String(v).trim()
+        break
+      }
+    }
+    if (foundForVm) vals.add(foundForVm)
+  }
+  if (vals.size === 0) return ''
+  if (vals.size === 1) return [...vals][0]
+  return [...vals].sort((a, b) => a.localeCompare(b, 'ru')).join(' / ')
+}
+
+/**
+ * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[]} members
+ * @param {string} authorKey
+ */
+function pickAuthorJoinedFromMembers(members, authorKey) {
+  if (!authorKey) return ''
+  const vals = new Set()
+  for (const m of members) {
+    const labels = m.labels || {}
+    const v = labels[authorKey]
+    if (v !== undefined && v !== null && String(v).trim() !== '') vals.add(String(v).trim())
+  }
+  if (vals.size === 0) return ''
+  if (vals.size === 1) return [...vals][0]
+  return [...vals].sort((a, b) => a.localeCompare(b, 'ru')).join(' / ')
+}
+
+/**
  * @param {string} u
  */
 function normalizeHttpUrl(u) {
@@ -300,11 +343,14 @@ function teamCityDateToRuDots(tc) {
  * @param {string[]} deleteMetaKeys
  */
 function pickDeleteDateRuForGroup(members, deleteLabelKeys, deleteMetaKeys) {
+  const vals = new Set()
   for (const m of preferAppMembersFirst(members)) {
     const tc = pickDeleteDateDisplay(m, deleteLabelKeys, deleteMetaKeys)
-    if (tc) return teamCityDateToRuDots(tc)
+    if (tc) vals.add(teamCityDateToRuDots(tc))
   }
-  return ''
+  if (vals.size === 0) return ''
+  if (vals.size === 1) return [...vals][0]
+  return [...vals].sort((a, b) => String(a).localeCompare(String(b), 'ru')).join(' / ')
 }
 
 /**
@@ -433,33 +479,41 @@ function actorIdentityLocalPart(s) {
  */
 export function computeOteRowMine(runBy, actor) {
   if (!actor) return false
-  const rb = String(runBy || '').trim().toLowerCase()
-  if (!rb) return false
+  const raw = String(runBy || '').trim().toLowerCase()
+  if (!raw) return false
   const login = String(actor.login || '').trim().toLowerCase()
   const email = String(actor.email || '').trim().toLowerCase()
 
   /** @type {Set<string>} */
   const ids = new Set()
-  for (const raw of [login, email]) {
-    if (!raw) continue
-    ids.add(raw)
-    const local = actorIdentityLocalPart(raw)
+  for (const r of [login, email]) {
+    if (!r) continue
+    ids.add(r)
+    const local = actorIdentityLocalPart(r)
     if (local) ids.add(local)
   }
 
-  if (ids.has(rb)) return true
+  const chunks = raw.includes(' / ')
+    ? raw.split(/\s*\/\s*/).map((s) => s.trim()).filter(Boolean)
+    : [raw]
 
-  const bs = rb.lastIndexOf('\\')
-  if (bs >= 0) {
-    const short = rb.slice(bs + 1)
-    if (ids.has(short)) return true
+  /** @param {string} rb */
+  function oneMatches(rb) {
+    if (ids.has(rb)) return true
+    const bs = rb.lastIndexOf('\\')
+    if (bs >= 0) {
+      const short = rb.slice(bs + 1)
+      if (ids.has(short)) return true
+    }
+    const at = rb.indexOf('@')
+    if (at > 0) {
+      const short = rb.slice(0, at)
+      if (ids.has(short)) return true
+    }
+    return false
   }
-  const at = rb.indexOf('@')
-  if (at > 0) {
-    const short = rb.slice(0, at)
-    if (ids.has(short)) return true
-  }
-  return false
+
+  return chunks.some(oneMatches)
 }
 
 /**
@@ -485,12 +539,10 @@ export function attachMvpFields(row, members, mvp, labelKey, actor = null) {
   const first = members[0]
   const labels = first.labels || {}
   const oteName = (labelKey && labels[labelKey] && String(labels[labelKey]).trim()) || row.name || ''
-  const runBy = mvp.authorLabelKey
-    ? pickFirstLabelFromMembers(members, [mvp.authorLabelKey])
-    : ''
+  const runBy = mvp.authorLabelKey ? pickAuthorJoinedFromMembers(members, mvp.authorLabelKey) : ''
   const deleteDate = pickDeleteDateRuForGroup(members, mvp.deleteLabelKeys, mvp.deleteMetaKeys)
-  const versionBackend = pickFirstLabelFromMembers(members, mvp.versionBackendKeys)
-  const versionFrontend = pickFirstLabelFromMembers(members, mvp.versionFrontendKeys)
+  const versionBackend = pickJoinedLabelsFromMembers(members, mvp.versionBackendKeys)
+  const versionFrontend = pickJoinedLabelsFromMembers(members, mvp.versionFrontendKeys)
   const appUrl = buildAppUrlFromMembers(
     members,
     mvp.appUrlLabelKeys,
@@ -506,6 +558,14 @@ export function attachMvpFields(row, members, mvp, labelKey, actor = null) {
     rabbitPort: mvp.rabbitManagementPort,
   })
   const mine = computeOteRowMine(runBy, actor)
+  const { listTotalCores, listTotalMemoryGb } = sumListResourcesFromMembers(members)
+  /** @type {Record<string, string>} */
+  const labelColumnValues = {}
+  for (const spec of OTE_YC_LABEL_EXTRA_COLUMNS) {
+    const lk = spec.labelKey
+    const cid = spec.id
+    if (lk && cid) labelColumnValues[cid] = pickJoinedLabelsFromMembers(members, [lk])
+  }
   return {
     ...row,
     mine,
@@ -517,6 +577,9 @@ export function attachMvpFields(row, members, mvp, labelKey, actor = null) {
     appUrl,
     appLinkOsKind: linkSet.osKind,
     appLinks: linkSet.items,
+    listTotalCores,
+    listTotalMemoryGb,
+    ...labelColumnValues,
   }
 }
 
@@ -643,6 +706,24 @@ export function pickCpuMemoryGb(inst) {
   const memBytes = Number(r && r.memory) || 0
   const memoryGb = Math.round((memBytes / (1024 * 1024 * 1024)) * 10) / 10
   return { cores, memoryGb }
+}
+
+/**
+ * Сумма vCPU и RAM по всем ВМ в строке списка OTE (как на карточке в таблице «Виртуальные машины», но агрегировано по группе).
+ * @param {import('@yandex-cloud/nodejs-sdk/dist/generated/yandex/cloud/compute/v1/instance').Instance[]} members
+ */
+export function sumListResourcesFromMembers(members) {
+  let totalCores = 0
+  let totalMemGb = 0
+  for (const inst of members || []) {
+    const { cores, memoryGb } = pickCpuMemoryGb(inst)
+    totalCores += cores
+    totalMemGb += memoryGb
+  }
+  return {
+    listTotalCores: totalCores,
+    listTotalMemoryGb: Math.round(totalMemGb * 10) / 10,
+  }
 }
 
 /**

@@ -31,4 +31,10 @@ describe('computeOteRowMine', () => {
       computeOteRowMine('petrov', { login: 'ivanov@corp.ru', email: 'ivanov@corp.ru' }),
     ).toBe(false)
   })
+
+  it('при нескольких авторах через « / » совпадает если текущий среди них', () => {
+    expect(
+      computeOteRowMine('petrov / ivanov', { login: 'ivanov@corp.ru', email: 'ivanov@corp.ru' }),
+    ).toBe(true)
+  })
 })
