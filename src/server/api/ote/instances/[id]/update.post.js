@@ -20,9 +20,10 @@ import { createYandexCloudSession } from '../../../../utils/yc/session.js'
 import { mapYcInstanceStatusToOte } from '../../../../utils/yc/compute.js'
 import { listMemberInstancesForOteId } from '../../../../utils/yc/ote-members.js'
 import { OTE_STATUS } from '@app-constants/ote.js'
-import { buildTemplateIdVisibleToUser } from '../../../../utils/build-template-access.js'
-import { integrationUserKey } from '../../../../utils/integrations/user-credentials.js'
-
+import {
+  buildTemplateIdVisibleToViewer,
+  resolveBuildTemplateViewer,
+} from '../../../../utils/build-template-access.js'
 /**
  * Обновить OTE той же сборкой TeamCity, что и при создании: тело `{ caseoneVersion, buildTemplateId? }`.
  * `metadata.tag` берётся с текущей OTE и передаётся в сборку как при создании (обновление существующей метки).
@@ -79,7 +80,6 @@ export default defineEventHandler(async (event) => {
 
   await assertMetadataTagNotBlockedByOteCreation(db, metadataTag)
 
-  const userKey = integrationUserKey(user)
   const rawTplId = body?.buildTemplateId
   let buildTemplateId =
     rawTplId != null && String(rawTplId).trim() !== '' ? Number(String(rawTplId).trim()) : NaN
@@ -96,9 +96,14 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  const visible = await buildTemplateIdVisibleToUser(db, buildTemplateId, userKey)
+  const viewer = await resolveBuildTemplateViewer(db, config, user)
+  const visible = viewer ? await buildTemplateIdVisibleToViewer(db, buildTemplateId, viewer) : false
   if (!visible) {
-    throw createError({ statusCode: 403, message: 'Нет доступа к выбранному шаблону сборки' })
+    throw createError({
+      statusCode: 403,
+      message:
+        'Нет доступа к выбранному шаблону сборки (общий шаблон выдан другим группам каталога).',
+    })
   }
 
   /** @type {Record<string, string>} */

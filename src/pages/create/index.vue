@@ -148,6 +148,13 @@
             :options="templateOptions"
             placeholder="Выберите шаблон"
           />
+          <p
+            v-if="currentTemplate && !currentTemplate.isPersonal && String(currentTemplate.groupsPreview || '').trim()"
+            class="mt-2 text-[12px] font-semibold leading-snug text-slate-600"
+          >
+            <span class="text-slate-500">Доступно группам:</span>
+            {{ currentTemplate.groupsPreview }}
+          </p>
           <div v-if="currentTemplate" class="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -206,6 +213,12 @@
               </div>
               <p class="mt-1.5 line-clamp-2 text-[11px] font-medium leading-snug text-slate-600">
                 {{ card.description || 'Без описания' }}
+              </p>
+              <p
+                v-if="!card.isPersonal && card.groupsPreview"
+                class="mt-1 line-clamp-2 text-[10px] font-bold uppercase tracking-wide text-emerald-900/70"
+              >
+                {{ card.groupsPreview }}
               </p>
             </div>
           </div>
@@ -409,9 +422,11 @@ import {
 } from 'lucide-vue-next'
 import { oteTcCreationStatusClass, oteTcCreationStatusLabel } from '~/utils/ote-tc-creation-status.js'
 import { useOteTemplateShortcuts } from '~/composables/useOteTemplateShortcuts.js'
+import { useAuthStore } from '~/stores/auth'
 
 const toast = useToast()
 const route = useRoute()
+const auth = useAuthStore()
 const { favoriteIds, loadShortcuts, toggleFavorite, isFavorite, recordRecent, orderedRecentIds } =
   useOteTemplateShortcuts()
 
@@ -461,6 +476,7 @@ const templateCards = computed(() => {
     name: String(t.name || `Шаблон #${t.id}`),
     description: typeof t.description === 'string' ? t.description : '',
     isPersonal: Boolean(t.isPersonal),
+    groupsPreview: typeof t.groupsPreview === 'string' ? t.groupsPreview.trim() : '',
   }))
 })
 
@@ -646,6 +662,53 @@ function resetYamlFromParams() {
   yamlDraft.value = yamlAutoRendered.value
 }
 
+/**
+ * Порядок для запуска: личные → общие вашей группы → остальные общие; внутри — по связке групп, затем по имени.
+ * @param {any[]} list
+ * @param {unknown} userGroupId
+ */
+function sortTemplatesForCreate(list, userGroupId) {
+  const gid = userGroupId != null && Number.isFinite(Number(userGroupId)) ? Math.trunc(Number(userGroupId)) : null
+  /** @type {any[]} */
+  const out = [...(list || [])]
+
+  /** @type {(a: any, b: any) => number} */
+  function nameCmp(a, b) {
+    return String(a?.name || '').localeCompare(String(b?.name || ''), 'ru')
+  }
+
+  /** Общие шаблоны: ключ сортировки по «набору групп» */
+  /** @param {any} t */
+  function sharedGroupKey(t) {
+    const pv = String(t?.groupsPreview || '').trim()
+    return pv ? pv : '\uf8ff — без ограничения группами'
+  }
+
+  /** Приоритет: 0 — явно доступен вашей группе по связке БД */
+  /** @param {any} t */
+  function tierShared(t) {
+    const ids = Array.isArray(t?.groupIds) ? t.groupIds.map((x) => Math.trunc(Number(x))) : []
+    const validIds = ids.filter((n) => Number.isInteger(n) && n > 0)
+    if (gid != null && validIds.length && validIds.includes(gid)) return 0
+    return 1
+  }
+
+  const personal = out.filter((t) => t?.isPersonal).sort(nameCmp)
+  /** @type {any[]} */
+  const shared = out.filter((t) => !t?.isPersonal)
+  shared.sort((a, b) => {
+    const ta = tierShared(a)
+    const tb = tierShared(b)
+    if (ta !== tb) return ta - tb
+    const ka = sharedGroupKey(a)
+    const kb = sharedGroupKey(b)
+    const c = ka.localeCompare(kb, 'ru')
+    if (c !== 0) return c
+    return nameCmp(a, b)
+  })
+  return [...personal, ...shared]
+}
+
 async function loadAll() {
   skipRecentRecord.value = true
   loading.value = true
@@ -658,7 +721,16 @@ async function loadAll() {
     tcReady.value = Boolean(tc?.teamcity?.ready)
     tcTokenSaved.value = Boolean(tc?.teamcity?.tokenSaved)
 
-    templates.value = Array.isArray(bt?.templates) ? bt.templates : []
+    const rawTpl = Array.isArray(bt?.templates) ? bt.templates : []
+    templates.value = sortTemplatesForCreate(rawTpl, auth.user?.group?.id)
+    if (
+      selectedTemplateId.value &&
+      templates.value.length &&
+      !templates.value.some((t) => String(t.id) === String(selectedTemplateId.value))
+    ) {
+      selectedTemplateId.value = ''
+      toast.show('Выбранный шаблон недоступен для вашей группы каталога — выберите другой.', 'warn')
+    }
     if (!selectedTemplateId.value && templates.value.length) {
       selectedTemplateId.value = String(templates.value[0].id)
     }

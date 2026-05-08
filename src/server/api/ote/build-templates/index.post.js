@@ -3,6 +3,12 @@ import { getDb } from '../../../db/client.js'
 import { oteBuildTemplates } from '../../../db/schema.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../utils/audit-log.js'
 import { parseIsPersonalFromBody, rowIsPersonal } from '../../../utils/build-template-access.js'
+import {
+  assertAllGroupIdsExist,
+  parseBuildTemplateGroupIdsFromBody,
+  syncBuildTemplateGroupLinks,
+  fetchGroupIdsForBuildTemplate,
+} from '../../../utils/build-template-groups.js'
 import { parseBuildTemplateParams } from '../../../utils/build-template-params.js'
 import { mapBuildTemplateFull } from '../../../utils/build-template-map.js'
 import { assertValidYamlString } from '../../../utils/deployment-template-yaml.js'
@@ -58,7 +64,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: e?.message || String(e) })
   }
 
-  const isPersonal = parseIsPersonalFromBody(body) ? 1 : 0
+  const personalBool = parseIsPersonalFromBody(body)
+  const groupIdsParsed = parseBuildTemplateGroupIdsFromBody(body)
+  const isPersonal = personalBool ? 1 : 0
+
+  if (!personalBool) {
+    await assertAllGroupIdsExist(db, groupIdsParsed)
+  }
+
   const now = new Date()
   const login = integrationUserKey(user)
   const email = String(user.email || '').trim()
@@ -93,6 +106,8 @@ export default defineEventHandler(async (event) => {
 
   if (!row) throw createError({ statusCode: 500, message: 'Не удалось сохранить шаблон' })
 
+  await syncBuildTemplateGroupLinks(db, Number(row.id), personalBool, groupIdsParsed)
+
   if (!rowIsPersonal(row.isPersonal)) {
     await recordAuditEvent(
       auditPayloadFromUser(user, {
@@ -104,6 +119,7 @@ export default defineEventHandler(async (event) => {
     )
   }
 
-  return { template: mapBuildTemplateFull(row) }
+  const groupIdsReturn = personalBool ? [] : await fetchGroupIdsForBuildTemplate(db, Number(row.id))
+  return { template: { ...mapBuildTemplateFull(row), groupIds: groupIdsReturn } }
 })
 

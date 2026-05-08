@@ -5,6 +5,7 @@ import { oteBuildTemplates } from '../../../db/schema.js'
 import { mergeParamsFromTemplateAndOverrides, queueOteTcJobFromBuildTemplate } from '../../../utils/ote-build-template-queue.js'
 import { OTE_TC_PRESET_BUILD_TEMPLATE } from '../../../utils/ote-tc-job-audit.js'
 import { rowToPublic } from '../../../utils/ote-tc-creation-sync.js'
+import { buildTemplateIdVisibleToViewer, resolveBuildTemplateViewer } from '../../../utils/build-template-access.js'
 import { requireOteUser } from '../../../utils/require-ote-auth.js'
 import { isTeamCityAuthAvailable } from '../../../utils/teamcity/resolve-auth.js'
 
@@ -37,6 +38,16 @@ export default defineEventHandler(async (event) => {
   const tpl = rows[0]
   if (!tpl) {
     throw createError({ statusCode: 404, message: 'Шаблон не найден' })
+  }
+
+  const viewer = await resolveBuildTemplateViewer(db, config, user)
+  const allowed = viewer ? await buildTemplateIdVisibleToViewer(db, buildTemplateId, viewer) : false
+  if (!allowed) {
+    throw createError({
+      statusCode: 403,
+      message:
+        'Нет доступа к этому общему шаблону: он выдан указанным группам каталога, вашей среди них нет. Выберите другой шаблон или обратитесь к администратору.',
+    })
   }
 
   const merged = mergeParamsFromTemplateAndOverrides(tpl.paramsJson, body?.overrides)

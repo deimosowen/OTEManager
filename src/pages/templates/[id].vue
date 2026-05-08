@@ -46,6 +46,15 @@
           </span>
         </label>
 
+        <AppGroupTagPicker
+          v-if="!form.isPersonal"
+          v-model="form.groupIds"
+          class="mt-5"
+          :groups="sortedCatalogGroups"
+          :error-message="catalogLoadError"
+          hint="Одну или несколько групп каталога. Запуск шаблона — только пользователям из выбранных групп."
+        />
+
         <div class="mt-5 grid gap-4 sm:grid-cols-2">
           <AppInput v-model="form.teamcityBuildTypeId" label="TeamCity buildTypeId" placeholder="Some_BuildTypeId" autocomplete="off" />
           <div class="flex flex-col justify-end">
@@ -164,6 +173,8 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useUserTimeFormat } from '~/composables/useUserTimeFormat'
 import { useAuthStore } from '~/stores/auth'
 
+/** @typedef {{ id: number, code: string, name: string, isSystem: boolean }} CatalogGroupRow */
+
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
@@ -178,6 +189,9 @@ const loadError = ref('')
 const saving = ref(false)
 const deleting = ref(false)
 
+const catalogGroups = ref(/** @type {CatalogGroupRow[]} */ ([]))
+const catalogLoadError = ref('')
+
 const form = reactive({
   name: '',
   description: '',
@@ -186,6 +200,8 @@ const form = reactive({
   params: [],
   yaml: '',
   isPersonal: false,
+  /** @type {number[]} */
+  groupIds: [],
 })
 
 const meta = reactive({
@@ -205,6 +221,10 @@ function applyTemplate(t) {
     .map(([key, value]) => ({ key: String(key || ''), value: value == null ? '' : String(value) }))
     .filter((x) => x.key.trim())
   form.isPersonal = Boolean(t.isPersonal)
+  const g = Array.isArray(t.groupIds)
+    ? t.groupIds.map((x) => Math.trunc(Number(x))).filter((n) => Number.isFinite(n) && n > 0)
+    : []
+  form.groupIds = form.isPersonal ? [] : [...new Set(g)]
   meta.createdAt = t.createdAt || ''
   meta.updatedAt = t.updatedAt || ''
   meta.createdByLogin = t.createdByLogin || ''
@@ -221,6 +241,36 @@ const computedTeamcityBuildUrl = computed(() => {
   return `${base}/buildConfiguration/${encodeURIComponent(id)}`
 })
 
+function defaultSharedGroupIds() {
+  const gid = auth.user?.group?.id
+  const n = gid != null ? Math.trunc(Number(gid)) : NaN
+  return Number.isFinite(n) && n > 0 ? [n] : []
+}
+
+watch(
+  () => form.isPersonal,
+  (v) => {
+    if (v) form.groupIds = []
+    else if (!form.groupIds.length) form.groupIds = defaultSharedGroupIds()
+  },
+)
+
+const sortedCatalogGroups = computed(() => {
+  const list = [...(catalogGroups.value || [])]
+  return list.sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), 'ru'))
+})
+
+async function loadCatalogGroups() {
+  catalogLoadError.value = ''
+  try {
+    const res = await $fetch('/api/ote/app-groups', { credentials: 'include' })
+    catalogGroups.value = Array.isArray(res?.groups) ? res.groups : []
+  } catch (e) {
+    catalogGroups.value = []
+    catalogLoadError.value = e?.data?.message || e?.message || String(e)
+  }
+}
+
 async function loadOne() {
   if (isNew.value) {
     form.name = ''
@@ -233,6 +283,7 @@ async function loadOne() {
       { key: 'caseone.version', value: 'latest' },
     ]
     form.isPersonal = false
+    form.groupIds = defaultSharedGroupIds()
     meta.createdAt = ''
     meta.updatedAt = ''
     meta.createdByLogin = ''
@@ -266,6 +317,7 @@ watch(
 )
 
 onMounted(() => {
+  void loadCatalogGroups()
   void loadOne()
 })
 
@@ -279,6 +331,15 @@ async function save() {
       if (!k) continue
       params[k] = p?.value == null ? '' : String(p.value)
     }
+    const groupIdsSorted = [...new Set(form.groupIds.map((x) => Math.trunc(Number(x))))].filter(
+      (n) => Number.isInteger(n) && n > 0,
+    )
+
+    if (!form.isPersonal && !groupIdsSorted.length) {
+      toast.show('Для общего шаблона выберите минимум одну группу каталога', 'error')
+      return
+    }
+
     if (isNew.value) {
       const res = await $fetch('/api/ote/build-templates', {
         method: 'POST',
@@ -290,6 +351,7 @@ async function save() {
           params,
           yaml: form.yaml,
           isPersonal: form.isPersonal,
+          groupIds: form.isPersonal ? [] : groupIdsSorted,
         },
       })
       const id = res?.template?.id
@@ -311,6 +373,7 @@ async function save() {
         params,
         yaml: form.yaml,
         isPersonal: form.isPersonal,
+        groupIds: form.isPersonal ? [] : groupIdsSorted,
       },
     })
     if (res?.template) applyTemplate(res.template)

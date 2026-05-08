@@ -1,15 +1,20 @@
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import { oteBuildTemplates, oteUserBuildTemplateFavorites, oteUserBuildTemplateRecent } from '../db/schema.js'
-import { whereBuildTemplateVisibleToUser } from './build-template-access.js'
+import { resolveBuildTemplateViewer, sqlBuildTemplatesReadable } from './build-template-access.js'
 
 const MAX_RECENT_ROWS = 15
 
 /**
  * @param {import('drizzle-orm/libsql').LibSQLDatabase<typeof import('../db/schema.js')>} db
- * @param {string} userKey
+ * @param {import('@nuxt/schema').NitroRuntimeConfig} config
+ * @param {{ login?: string, email?: string, id?: string, name?: string }} baseUserFromRequire
  */
-export async function getBuildTemplateShortcutsPayload(db, userKey) {
-  const vis = whereBuildTemplateVisibleToUser(userKey)
+export async function getBuildTemplateShortcutsPayload(db, config, baseUserFromRequire) {
+  const viewer = await resolveBuildTemplateViewer(db, config, baseUserFromRequire)
+  if (!viewer?.userKey) {
+    return { favoriteIds: [], recent: [] }
+  }
+  const vis = sqlBuildTemplatesReadable(viewer)
 
   const favRows = await db
     .select({
@@ -17,7 +22,7 @@ export async function getBuildTemplateShortcutsPayload(db, userKey) {
     })
     .from(oteUserBuildTemplateFavorites)
     .innerJoin(oteBuildTemplates, eq(oteBuildTemplates.id, oteUserBuildTemplateFavorites.buildTemplateId))
-    .where(and(eq(oteUserBuildTemplateFavorites.userLogin, userKey), vis))
+    .where(and(eq(oteUserBuildTemplateFavorites.userLogin, viewer.userKey), vis))
     .orderBy(oteUserBuildTemplateFavorites.addedAt)
 
   const favoriteIds = favRows.map((r) => String(r.id))
@@ -29,7 +34,7 @@ export async function getBuildTemplateShortcutsPayload(db, userKey) {
     })
     .from(oteUserBuildTemplateRecent)
     .innerJoin(oteBuildTemplates, eq(oteBuildTemplates.id, oteUserBuildTemplateRecent.buildTemplateId))
-    .where(and(eq(oteUserBuildTemplateRecent.userLogin, userKey), vis))
+    .where(and(eq(oteUserBuildTemplateRecent.userLogin, viewer.userKey), vis))
     .orderBy(desc(oteUserBuildTemplateRecent.lastUsedAt))
     .limit(MAX_RECENT_ROWS)
 
@@ -45,7 +50,6 @@ export async function getBuildTemplateShortcutsPayload(db, userKey) {
 /**
  * @param {import('drizzle-orm/libsql').LibSQLDatabase<typeof import('../db/schema.js')>} db
  * @param {string} userKey
- * @param {number} buildTemplateId
  */
 export async function pruneRecentForUser(db, userKey) {
   const rows = await db

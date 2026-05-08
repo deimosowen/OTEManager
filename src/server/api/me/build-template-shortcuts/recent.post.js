@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 import { getDb } from '../../../db/client.js'
 import { oteUserBuildTemplateRecent } from '../../../db/schema.js'
-import { buildTemplateIdVisibleToUser } from '../../../utils/build-template-access.js'
+import { buildTemplateIdVisibleToViewer, resolveBuildTemplateViewer } from '../../../utils/build-template-access.js'
 import { getBuildTemplateShortcutsPayload, pruneRecentForUser } from '../../../utils/build-template-shortcuts.js'
 import { integrationUserKey } from '../../../utils/integrations/user-credentials.js'
 import { requireOteUser } from '../../../utils/require-ote-auth.js'
@@ -17,7 +17,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const db = getDb()
-  const visible = await buildTemplateIdVisibleToUser(db, id, me)
+  const config = useRuntimeConfig(event)
+  const viewer = await resolveBuildTemplateViewer(db, config, user)
+  const visible = viewer ? await buildTemplateIdVisibleToViewer(db, id, viewer) : false
   if (!visible) {
     throw createError({ statusCode: 404, message: 'Шаблон не найден или недоступен' })
   }
@@ -45,5 +47,5 @@ export default defineEventHandler(async (event) => {
   }
 
   await pruneRecentForUser(db, me)
-  return getBuildTemplateShortcutsPayload(db, me)
+  return await getBuildTemplateShortcutsPayload(db, config, user)
 })
