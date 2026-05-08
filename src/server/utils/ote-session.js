@@ -5,6 +5,9 @@ export const OTE_SESSION_COOKIE = 'ote_session'
 export const OTE_STATE_COOKIE = 'yandex_oauth_state'
 export const OTE_RETURN_COOKIE = 'yandex_oauth_return'
 
+/** После перехода по /invite — ожидание авторизации или применение смены группы (httpOnly). */
+export const OTE_GROUP_INVITE_COOKIE = 'ote_group_invite_token'
+
 const MAX_AGE_SEC = 60 * 60 * 24 * 7
 
 /**

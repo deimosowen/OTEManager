@@ -1,4 +1,4 @@
-import { getCookie, deleteCookie } from 'h3'
+import { deleteCookie } from 'h3'
 import { AUDIT_ACTION } from '@app-constants/audit.js'
 import { recordAuditEvent } from '../../../utils/audit-log.js'
 import {
@@ -117,6 +117,6 @@ export default defineEventHandler(async (event) => {
 
   clearOAuthCookies()
 
-  const safe = safeReturnPath(returnTo)
-  return sendRedirect(event, safe, 302)
+  const target = safeReturnPath(returnTo)
+  return sendRedirect(event, target, 302)
 })

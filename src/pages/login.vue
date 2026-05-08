@@ -326,6 +326,8 @@
 </template>
 
 <script setup>
+import { safeReturnPath } from '~/utils/safe-return-path'
+
 definePageMeta({ layout: 'auth' })
 
 const route = useRoute()
@@ -345,6 +347,9 @@ const callbackHint = computed(() => {
 })
 
 function onLogin() {
-  auth.startYandexLogin('/')
+  const raw = route.query.return
+  const fromQuery = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw[0] : ''
+  const path = safeReturnPath(fromQuery || '/')
+  auth.startYandexLogin(path)
 }
 </script>

@@ -4,6 +4,12 @@
  */
 export default defineNuxtRouteMiddleware((to) => {
   const auth = useAuthStore()
+
+  /** Ссылка приглашения обрабатывается Nitro (редирект); без входа её нельзя гонять через login. */
+  if (to.path === '/invite') {
+    return
+  }
+
   const publicPaths = ['/login']
 
   if (publicPaths.includes(to.path)) {
@@ -11,5 +17,10 @@ export default defineNuxtRouteMiddleware((to) => {
     return
   }
 
-  if (!auth.isLoggedIn) return navigateTo('/login')
+  if (!auth.isLoggedIn) {
+    if (to.path === '/invite/confirm') {
+      return navigateTo({ path: '/login', query: { return: '/invite/confirm' } })
+    }
+    return navigateTo('/login')
+  }
 })
