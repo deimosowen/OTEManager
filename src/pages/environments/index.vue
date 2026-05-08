@@ -18,12 +18,37 @@
       </NuxtLink>
     </div>
 
-    <OteFiltersBar
+    <div
       v-if="store.listSource === 'yc' || store.listSource === 'seed'"
-      :model-value="store.filters"
-      :product-options="store.productOptions"
-      :type-options="store.typeOptions"
-      @update:model-value="onFilters"
+      class="mb-5 flex flex-nowrap items-end gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <div class="min-w-0 flex-1">
+        <OteFiltersBar
+          no-outer-margin
+          :model-value="store.filters"
+          :product-options="store.productOptions"
+          :type-options="store.typeOptions"
+          @update:model-value="onFilters"
+        />
+      </div>
+      <button
+        v-if="store.listSource === 'yc'"
+        type="button"
+        class="flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:border-brand/40 hover:text-brand sm:px-4"
+        title="Настроить колонки таблицы"
+        @click="openListColumnsModal"
+      >
+        <Columns3 class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+        Колонки
+      </button>
+    </div>
+
+    <OteListColumnsModal
+      v-model="listColumnsModalOpen"
+      :registry="listColumnsRegistry"
+      :items="listColumnsItems"
+      :grouped-value-layout="listColumnsGroupedLayout"
+      @saved="onListColumnsSaved"
     />
 
     <section
@@ -63,7 +88,11 @@
     </section>
 
     <template v-else-if="store.listSource === 'yc'">
-      <OteMvpYcTable :rows="store.filteredItems" />
+      <OteMvpYcTable
+        :rows="store.filteredItems"
+        :columns-layout="ycTableColumnsLayout"
+        :grouped-value-layout="ycGroupedValueLayout"
+      />
       <OteInstancesSummaryBlock v-if="store.tcTable?.summary" :summary="store.tcTable.summary" class="mt-4" />
       <details
         class="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-700"
@@ -93,14 +122,70 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue'
-import { Plus } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Columns3, Plus } from 'lucide-vue-next'
+import {
+  defaultOteGroupedValueLayoutForOteYc,
+  defaultOteYcColumnPrefItems,
+  OTE_YC_LIST_REGISTRY,
+} from '@app-constants/ote-list-columns.js'
 import { subscribeOteInstancesRefresh } from '~/composables/useOteInstancesBroadcast'
 import { useEnvironmentsStore } from '~/stores/environments'
 import { OTE_STATUS } from '~/constants/ote'
 
 const store = useEnvironmentsStore()
 const toast = useToast()
+
+const listColumnsModalOpen = ref(false)
+/** @type {import('vue').Ref<{ registry: typeof OTE_YC_LIST_REGISTRY, items: { id: string, visible: boolean }[], groupedValueLayout?: string } | null>} */
+const ycListColumnPrefsPayload = ref(null)
+
+const listColumnsRegistry = computed(() => ycListColumnPrefsPayload.value?.registry || OTE_YC_LIST_REGISTRY)
+const listColumnsItems = computed(() => ycListColumnPrefsPayload.value?.items || defaultOteYcColumnPrefItems())
+const listColumnsGroupedLayout = computed(
+  () => ycListColumnPrefsPayload.value?.groupedValueLayout ?? defaultOteGroupedValueLayoutForOteYc(),
+)
+const ycGroupedValueLayout = listColumnsGroupedLayout
+
+const ycTableColumnsLayout = computed(() => {
+  const p = ycListColumnPrefsPayload.value
+  if (!p?.items?.length) return null
+  const reg = new Map(p.registry.map((c) => [c.id, c]))
+  const out = []
+  for (const it of p.items) {
+    if (!it.visible) continue
+    const def = reg.get(it.id)
+    if (def) out.push({ id: def.id, label: def.label, category: def.category })
+  }
+  return out.length ? out : null
+})
+
+function openListColumnsModal() {
+  listColumnsModalOpen.value = true
+}
+
+/** @param {Record<string, unknown>} res */
+function onListColumnsSaved(res) {
+  const registry = Array.isArray(res.registry) ? res.registry : OTE_YC_LIST_REGISTRY
+  const items = Array.isArray(res.items) ? res.items : defaultOteYcColumnPrefItems()
+  const groupedValueLayout =
+    typeof res.groupedValueLayout === 'string' ? res.groupedValueLayout : defaultOteGroupedValueLayoutForOteYc()
+  ycListColumnPrefsPayload.value = { registry, items, groupedValueLayout }
+}
+
+async function refreshYcListColumnPrefs() {
+  try {
+    ycListColumnPrefsPayload.value = await $fetch('/api/me/ote-list-columns', {
+      credentials: 'include',
+    })
+  } catch {
+    ycListColumnPrefsPayload.value = {
+      registry: OTE_YC_LIST_REGISTRY,
+      items: defaultOteYcColumnPrefItems(),
+      groupedValueLayout: defaultOteGroupedValueLayoutForOteYc(),
+    }
+  }
+}
 
 const discoverPayload = ref('')
 const discoverLoading = ref(false)
@@ -113,8 +198,14 @@ watch(
       discoverPayload.value = ''
       discoverError.value = ''
     }
+    if (src === 'yc') void refreshYcListColumnPrefs()
   },
+  { immediate: true },
 )
+
+watch(listColumnsModalOpen, (open) => {
+  if (open && store.listSource === 'yc') void refreshYcListColumnPrefs()
+})
 
 async function retryEnvironmentsLoad() {
   try {

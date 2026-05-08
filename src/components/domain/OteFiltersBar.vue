@@ -1,6 +1,9 @@
 <template>
   <div
-    class="mb-5 flex flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    :class="[
+      noOuterMargin ? 'mb-0' : 'mb-5',
+      'flex flex-nowrap items-center gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+    ]"
   >
     <div class="relative min-w-[140px] max-w-[240px] shrink-0 basis-[min(100%,200px)] sm:basis-[220px]">
       <Search class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -58,6 +61,7 @@ const props = defineProps({
   modelValue: { type: Object, required: true },
   productOptions: { type: Array, default: () => [] },
   typeOptions: { type: Array, default: () => [] },
+  noOuterMargin: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue'])
