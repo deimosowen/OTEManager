@@ -327,3 +327,21 @@ export const oteUserBuildTemplateRecent = sqliteTable(
     userTimeIdx: index('ote_user_btrec_user_time_idx').on(t.userLogin, t.lastUsedAt),
   }),
 )
+
+/**
+ * Колонки списка OTE в UI по пользователю (режим представления — `view_key`).
+ * JSON: `{ "items": [{ "id": "ote", "visible": true }, …] }`.
+ */
+export const oteUserListColumnPrefs = sqliteTable(
+  'ote_user_list_column_prefs',
+  {
+    userKey: text('user_key', { length: 256 }).notNull(),
+    viewKey: text('view_key', { length: 64 }).notNull(),
+    prefsJson: text('prefs_json').notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.userKey, t.viewKey] }),
+    updatedIdx: index('ote_user_list_column_prefs_updated_idx').on(t.updatedAt),
+  }),
+)
