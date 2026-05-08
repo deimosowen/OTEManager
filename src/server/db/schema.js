@@ -183,6 +183,23 @@ export const oteAppGroups = sqliteTable(
   }),
 )
 
+/** Связка общего шаблона сборки с группами каталога (доступ есть, если пользователь состоит в любой из перечисленных). */
+export const oteBuildTemplateGroups = sqliteTable(
+  'ote_build_template_groups',
+  {
+    buildTemplateId: integer('build_template_id')
+      .notNull()
+      .references(() => oteBuildTemplates.id, { onDelete: 'cascade' }),
+    groupId: integer('group_id')
+      .notNull()
+      .references(() => oteAppGroups.id, { onDelete: 'cascade' }),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.buildTemplateId, t.groupId] }),
+    groupIdx: index('ote_bt_groups_group_idx').on(t.groupId),
+  }),
+)
+
 /** TeamCity: URL и buildTypeId для операций — настройки по группе. */
 export const oteGroupTeamcitySettings = sqliteTable('ote_group_teamcity_settings', {
   groupId: integer('group_id')

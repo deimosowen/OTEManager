@@ -13,36 +13,23 @@
       {{ error }}
     </div>
 
-    <div class="mb-4 flex flex-wrap items-center gap-2.5">
-      <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">Показать</span>
-      <div class="inline-flex flex-wrap gap-1.5 rounded-xl border border-slate-200 bg-slate-50/90 p-1 shadow-inner">
-        <button
-          v-for="opt in personalFilterOptions"
-          :key="opt.value"
-          type="button"
-          class="rounded-lg px-3 py-1.5 text-xs font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-1"
-          :class="
-            personalFilter === opt.value
-              ? 'bg-white text-brand shadow-sm ring-1 ring-slate-200/80'
-              : 'text-slate-600 hover:bg-white/70 hover:text-slate-900'
-          "
-          @click="setPersonalFilter(opt.value)"
-        >
-          {{ opt.label }}
-        </button>
-      </div>
-    </div>
-
     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-card">
       <div class="overflow-x-auto">
-        <table class="min-w-[980px] w-full border-collapse text-sm">
+        <table class="min-w-[800px] w-full max-w-none table-fixed border-collapse text-sm">
+          <colgroup>
+            <col class="w-[20%]" />
+            <col class="w-[42%]" />
+            <col class="w-[15%]" />
+            <col class="w-[11%]" />
+            <col class="w-[12%]" />
+          </colgroup>
           <thead>
             <tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
-              <th class="px-4 py-3">Название</th>
-              <th class="px-4 py-3">TeamCity</th>
-              <th class="px-4 py-3">Доступ</th>
-              <th class="px-4 py-3">Изменён</th>
-              <th class="px-4 py-3">Автор изменения</th>
+              <th class="min-w-[8rem] px-3 py-3">Название</th>
+              <th class="min-w-0 px-3 py-3">TeamCity</th>
+              <th class="min-w-[13.5rem] whitespace-nowrap px-2 py-3">Доступ</th>
+              <th class="min-w-[9.5rem] whitespace-nowrap px-3 py-3">Изменён</th>
+              <th class="min-w-[7.5rem] px-3 py-3">Автор изменения</th>
             </tr>
           </thead>
           <tbody>
@@ -56,45 +43,37 @@
               </td>
             </tr>
             <tr v-for="r in rows" :key="r.id" class="border-b border-slate-100 last:border-b-0">
-              <td class="px-4 py-2.5">
-                <div class="flex min-w-0 flex-wrap items-center gap-2">
-                  <NuxtLink :to="`/templates/${r.id}`" class="min-w-0 font-bold text-brand hover:underline">
-                    <span class="break-words">{{ r.name }}</span>
-                  </NuxtLink>
-                  <PersonalTemplateBadge v-if="r.isPersonal" class="shrink-0" />
+              <td class="max-w-0 px-3 py-2.5 align-top">
+                <NuxtLink :to="`/templates/${r.id}`" class="block min-w-0 font-bold text-brand hover:underline">
+                  <span class="break-words">{{ r.name }}</span>
+                </NuxtLink>
+              </td>
+              <td class="min-w-0 px-3 py-2.5 font-mono text-xs text-slate-700">
+                <div class="flex min-w-0 items-baseline gap-2">
+                  <a
+                    v-if="r.teamcityBuildConfigUrl"
+                    :href="r.teamcityBuildConfigUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="shrink-0 font-bold text-brand hover:underline"
+                  >
+                    build
+                  </a>
+                  <span v-else class="shrink-0 font-bold text-slate-400">—</span>
+                  <span class="text-slate-300">·</span>
+                  <span
+                    class="min-w-0 truncate font-mono"
+                    :title="r.teamcityBuildTypeId || ''"
+                  >{{ r.teamcityBuildTypeId || '—' }}</span>
                 </div>
               </td>
-              <td class="px-4 py-2.5 font-mono text-xs text-slate-700">
-                <a
-                  v-if="r.teamcityBuildConfigUrl"
-                  :href="r.teamcityBuildConfigUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="font-bold text-brand hover:underline"
-                >
-                  build
-                </a>
-                <span class="mx-2 text-slate-300">·</span>
-                <span>{{ r.teamcityBuildTypeId || '—' }}</span>
+              <td class="overflow-visible whitespace-nowrap px-2 py-2.5 align-middle">
+                <TemplatesSharedAccessBadge :row="r" />
               </td>
-              <td class="whitespace-nowrap px-4 py-2.5">
-                <span
-                  v-if="r.isPersonal"
-                  class="inline-flex items-center gap-1 rounded-lg border border-violet-100 bg-violet-50/80 px-2 py-1 text-xs font-bold text-violet-900"
-                >
-                  <Lock class="size-3.5 shrink-0 opacity-80" aria-hidden="true" />
-                  Только автор
-                </span>
-                <span
-                  v-else
-                  class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-bold text-slate-600"
-                >
-                  <Users class="size-3.5 shrink-0 opacity-70" aria-hidden="true" />
-                  Общий
-                </span>
+              <td class="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-slate-800">
+                {{ formatDateTimeSeconds(r.updatedAt) }}
               </td>
-              <td class="whitespace-nowrap px-4 py-2.5 font-mono text-xs text-slate-800">{{ formatDateTimeSeconds(r.updatedAt) }}</td>
-              <td class="max-w-[240px] truncate px-4 py-2.5 text-slate-700" :title="r.updatedByEmail || ''">
+              <td class="max-w-0 truncate px-3 py-2.5 text-slate-700" :title="r.updatedByEmail || ''">
                 {{ r.updatedByLogin || '—' }}
               </td>
             </tr>
@@ -106,7 +85,6 @@
 </template>
 
 <script setup>
-import { Lock, Users } from 'lucide-vue-next'
 import { onMounted, ref } from 'vue'
 import { useUserTimeFormat } from '~/composables/useUserTimeFormat'
 
@@ -116,22 +94,9 @@ const { formatDateTimeSeconds } = useUserTimeFormat()
 const rows = ref([])
 const loading = ref(true)
 const error = ref('')
-const personalFilter = ref('all')
-
-const personalFilterOptions = [
-  { value: 'all', label: 'Все доступные' },
-  { value: 'no', label: 'Только общие' },
-  { value: 'yes', label: 'Только личные' },
-]
 
 function goNew() {
   void router.push('/templates/new')
-}
-
-function setPersonalFilter(v) {
-  if (personalFilter.value === v) return
-  personalFilter.value = v
-  void load()
 }
 
 async function load() {
@@ -140,7 +105,7 @@ async function load() {
   try {
     const res = await $fetch('/api/ote/build-templates', {
       credentials: 'include',
-      query: { personal: personalFilter.value },
+      query: { browse: '1' },
     })
     rows.value = Array.isArray(res?.templates) ? res.templates : []
   } catch (e) {

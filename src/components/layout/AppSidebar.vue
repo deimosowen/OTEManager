@@ -23,6 +23,7 @@
           :to="`/create?template=${encodeURIComponent(String(q.id))}`"
           class="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-brand-light hover:text-brand"
           :class="isQuickLaunchActive(q.id) ? 'bg-brand-light/60 text-brand' : ''"
+          :title="q.groupsPreview ? `${q.name} · доступ: ${q.groupsPreview}` : String(q.name || '')"
         >
           <Star v-if="q.kind === 'fav'" class="size-3.5 shrink-0 fill-amber-400 text-amber-500" aria-hidden="true" />
           <Clock v-else class="size-3.5 shrink-0 text-slate-400" aria-hidden="true" />
@@ -60,16 +61,32 @@ const buildTemplates = ref(/** @type {any[]} */ ([]))
 const quickLaunchItems = computed(() => {
   const map = new Map(buildTemplates.value.map((t) => [String(t.id), t]))
   const favSet = new Set(favoriteIds.value.map(String))
-  /** @type {{ id: string | number, name: string, kind: 'fav' | 'recent' }[]} */
+  /** @type {{ id: string | number, name: string, kind: 'fav' | 'recent', groupsPreview?: string }[]} */
   const out = []
   for (const id of favoriteIds.value) {
     const t = map.get(String(id))
-    if (t) out.push({ id: t.id, name: String(t.name || `#${t.id}`), kind: 'fav' })
+    if (t) {
+      out.push({
+        id: t.id,
+        name: String(t.name || `#${t.id}`),
+        groupsPreview:
+          typeof t.groupsPreview === 'string' && t.groupsPreview.trim() ? t.groupsPreview.trim() : '',
+        kind: 'fav',
+      })
+    }
   }
   for (const id of orderedRecentIds()) {
     if (favSet.has(String(id))) continue
     const t = map.get(String(id))
-    if (t) out.push({ id: t.id, name: String(t.name || `#${t.id}`), kind: 'recent' })
+    if (t) {
+      out.push({
+        id: t.id,
+        name: String(t.name || `#${t.id}`),
+        groupsPreview:
+          typeof t.groupsPreview === 'string' && t.groupsPreview.trim() ? t.groupsPreview.trim() : '',
+        kind: 'recent',
+      })
+    }
   }
   return out.slice(0, 10)
 })
