@@ -17,10 +17,10 @@
     </div>
 
     <AppSelect
-      class="w-[148px] shrink-0 sm:w-[160px]"
-      :model-value="local.product"
-      :options="productOpts"
-      @update:model-value="(v) => ((local.product = v), emitFilters())"
+      class="w-[158px] shrink-0 sm:w-[172px]"
+      :model-value="local.author"
+      :options="authorOpts"
+      @update:model-value="(v) => ((local.author = v), emitFilters())"
     />
     <AppSelect
       class="w-[148px] shrink-0 sm:w-[160px]"
@@ -59,7 +59,7 @@ import { FILTER_STATUS_OPTIONS } from '~/constants/ote'
 
 const props = defineProps({
   modelValue: { type: Object, required: true },
-  productOptions: { type: Array, default: () => [] },
+  authorOptions: { type: Array, default: () => [] },
   typeOptions: { type: Array, default: () => [] },
   noOuterMargin: { type: Boolean, default: false },
 })
@@ -68,7 +68,7 @@ const emit = defineEmits(['update:modelValue'])
 
 const local = reactive({
   query: props.modelValue.query,
-  product: props.modelValue.product,
+  author: props.modelValue.author,
   status: props.modelValue.status,
   type: props.modelValue.type,
   onlyMine: props.modelValue.onlyMine,
@@ -78,7 +78,7 @@ watch(
   () => props.modelValue,
   (v) => {
     local.query = v.query
-    local.product = v.product
+    local.author = v.author
     local.status = v.status
     local.type = v.type
     local.onlyMine = v.onlyMine
@@ -86,9 +86,9 @@ watch(
   { deep: true },
 )
 
-const productOpts = computed(() => [
-  { value: '', label: 'Продукт' },
-  ...props.productOptions.filter(Boolean).map((p) => ({ value: p, label: p })),
+const authorOpts = computed(() => [
+  { value: '', label: 'Автор' },
+  ...props.authorOptions.filter(Boolean).map((p) => ({ value: p, label: p })),
 ])
 
 const typeOpts = computed(() => [
@@ -104,7 +104,7 @@ function emitFilters() {
 
 function reset() {
   local.query = ''
-  local.product = ''
+  local.author = ''
   local.status = ''
   local.type = ''
   local.onlyMine = false

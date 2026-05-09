@@ -27,7 +27,7 @@
           <OteFiltersBar
             no-outer-margin
             :model-value="store.filters"
-            :product-options="store.productOptions"
+            :author-options="store.authorOptions"
             :type-options="store.typeOptions"
             @update:model-value="onFilters"
           />
