@@ -7,8 +7,9 @@
       v-for="item in navItems"
       :key="item.to"
       :to="item.to"
-      class="flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-sm font-semibold text-slate-500 transition hover:bg-brand-light hover:text-brand"
-      :class="isActive(item) ? '!bg-brand !text-white' : ''"
+      :aria-current="isActive(item) ? 'page' : undefined"
+      class="flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-sm font-semibold text-slate-500 transition hover:bg-brand-light hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+      :class="isActive(item) ? '!bg-brand !text-white shadow-sm hover:!bg-brand-dark' : ''"
     >
       <component :is="item.icon" class="size-[18px] shrink-0" />
       {{ item.label }}
@@ -21,8 +22,8 @@
           v-for="q in quickLaunchItems"
           :key="`ql-${q.id}`"
           :to="`/create?template=${encodeURIComponent(String(q.id))}`"
-          class="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-brand-light hover:text-brand"
-          :class="isQuickLaunchActive(q.id) ? 'bg-brand-light/60 text-brand' : ''"
+          class="flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-brand-light hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+          :class="isQuickLaunchActive(q.id) ? 'bg-brand-light/70 text-brand ring-1 ring-brand/25' : ''"
           :title="q.groupsPreview ? `${q.name} · доступ: ${q.groupsPreview}` : String(q.name || '')"
         >
           <Star v-if="q.kind === 'fav'" class="size-3.5 shrink-0 fill-amber-400 text-amber-500" aria-hidden="true" />

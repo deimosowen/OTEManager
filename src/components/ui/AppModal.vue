@@ -6,6 +6,7 @@
       role="dialog"
       aria-modal="true"
       :aria-labelledby="labelledby || undefined"
+      @keyup.escape="onEscape"
     >
       <div
         class="absolute inset-0 bg-slate-900/55 backdrop-blur-[2px] transition-opacity"
@@ -30,7 +31,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, watch, onUnmounted } from 'vue'
 
 const BAR_H = /** @type {const} */ ({
   sm: 'h-1 shrink-0',
@@ -73,4 +74,21 @@ function onBackdropClick() {
   if (!props.backdropDismissible) return
   emit('update:modelValue', false)
 }
+
+function onEscape() {
+  onBackdropClick()
+}
+
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (typeof document === 'undefined') return
+    document.documentElement.classList.toggle('overflow-hidden', Boolean(open))
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  if (typeof document !== 'undefined') document.documentElement.classList.remove('overflow-hidden')
+})
 </script>
