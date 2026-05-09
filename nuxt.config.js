@@ -193,7 +193,9 @@ export default defineNuxtConfig({
     head: {
       title: 'OTE Manager',
       htmlAttrs: { lang: 'ru' },
+      meta: [{ name: 'theme-color', content: '#1E3A5F' }],
       link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg', sizes: 'any' },
         {
           rel: 'stylesheet',
           href: 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap',
