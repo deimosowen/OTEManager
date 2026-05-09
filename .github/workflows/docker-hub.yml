@@ -1,0 +1,76 @@
+# Публикация в Docker Hub при пуше в main, если в package.json изменилась версия.
+# Секреты репозитория: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN (Access Token с правом Read, Write & Delete).
+name: Docker Hub
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # В форках секретов Docker Hub обычно нет — не тратим очередь впустую
+    if: github.event.repository.fork == false
+    steps:
+      - name: Checkout (история для сравнения версии)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Версия и факт изменения
+        id: meta
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+            echo "::error::Версия в package.json некорректна для тега: $VERSION"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          BEFORE="${{ github.event.before }}"
+          ZERO=0000000000000000000000000000000000000000
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "$ZERO" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Нет родительского коммита (первый пуш и т.п.) — публикацию пропускаем."
+            exit 0
+          fi
+          OLD=$(git show "${BEFORE}:package.json" 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" || true)
+          if [ -z "$OLD" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Не удалось прочитать package.json в before=$BEFORE — пропуск."
+            exit 0
+          fi
+          echo "previous=$OLD"
+          if [ "$VERSION" = "$OLD" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Версия не менялась ($VERSION), push в Hub не нужен."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Версия: $OLD -> $VERSION"
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.meta.outputs.changed == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: steps.meta.outputs.changed == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        if: steps.meta.outputs.changed == 'true'
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          IMAGE: deimosowen/ote-manager
+        run: |
+          set -euo pipefail
+          docker build -t "${IMAGE}:${VERSION}" .
+          docker tag "${IMAGE}:${VERSION}" "${IMAGE}:latest"
+          docker push "${IMAGE}:${VERSION}"
+          docker push "${IMAGE}:latest"
