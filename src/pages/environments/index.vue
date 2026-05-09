@@ -7,40 +7,42 @@
       @confirm="onSeedDeleteConfirm"
     />
 
-    <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-      <h1 class="text-[22px] font-extrabold tracking-tight text-slate-900">Окружения OTE</h1>
-      <NuxtLink
-        to="/create"
-        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-bold text-white shadow transition hover:-translate-y-px hover:bg-brand-dark hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
-      >
-        <Plus class="size-3.5" />
-        Создать новую OTE
-      </NuxtLink>
-    </div>
-
-    <div
-      v-if="store.listSource === 'yc' || store.listSource === 'seed'"
-      class="mb-5 flex flex-nowrap items-end gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-    >
-      <div class="min-w-0 flex-1">
-        <OteFiltersBar
-          no-outer-margin
-          :model-value="store.filters"
-          :product-options="store.productOptions"
-          :type-options="store.typeOptions"
-          @update:model-value="onFilters"
-        />
+    <div data-tour="tour-env-overview" class="mb-5 space-y-5">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h1 class="text-[22px] font-extrabold tracking-tight text-slate-900">Окружения OTE</h1>
+        <NuxtLink
+          to="/create"
+          class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-bold text-white shadow transition hover:-translate-y-px hover:bg-brand-dark hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+        >
+          <Plus class="size-3.5" />
+          Создать новую OTE
+        </NuxtLink>
       </div>
-      <button
-        v-if="store.listSource === 'yc'"
-        type="button"
-        class="flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:border-brand/40 hover:text-brand sm:px-4"
-        title="Настроить колонки таблицы"
-        @click="openListColumnsModal"
+
+      <div
+        v-if="store.listSource === 'yc' || store.listSource === 'seed'"
+        class="flex flex-nowrap items-end gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <Columns3 class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
-        Колонки
-      </button>
+        <div class="min-w-0 flex-1">
+          <OteFiltersBar
+            no-outer-margin
+            :model-value="store.filters"
+            :product-options="store.productOptions"
+            :type-options="store.typeOptions"
+            @update:model-value="onFilters"
+          />
+        </div>
+        <button
+          v-if="store.listSource === 'yc'"
+          type="button"
+          class="flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:border-brand/40 hover:text-brand sm:px-4"
+          title="Настроить колонки таблицы"
+          @click="openListColumnsModal"
+        >
+          <Columns3 class="size-4 shrink-0 text-slate-500" aria-hidden="true" />
+          Колонки
+        </button>
+      </div>
     </div>
 
     <OteListColumnsModal

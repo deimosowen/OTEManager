@@ -1,11 +1,13 @@
 <template>
   <aside
+    data-tour="tour-sidebar-nav"
     class="flex w-[200px] shrink-0 flex-col gap-1 border-r border-slate-200 bg-white px-3 py-4"
     :style="{ minHeight: 'calc(100vh - 3.5rem)' }"
   >
     <NuxtLink
       v-for="item in navItems"
       :key="item.to"
+      :data-tour="sidebarItemTour(item.to)"
       :to="item.to"
       :aria-current="isActive(item) ? 'page' : undefined"
       class="flex items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-sm font-semibold text-slate-500 transition hover:bg-brand-light hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
@@ -91,6 +93,18 @@ const quickLaunchItems = computed(() => {
   }
   return out.slice(0, 10)
 })
+
+/** Якоря для пошагового онбординга (только нужные пункты получают data-tour). */
+function sidebarItemTour(to) {
+  /** @type {Record<string, string>} */
+  const m = {
+    '/': 'tour-sidebar-home',
+    '/environments': 'tour-sidebar-env',
+    '/create': 'tour-sidebar-create',
+    '/templates': 'tour-sidebar-templates',
+  }
+  return m[to] ?? undefined
+}
 
 function isQuickLaunchActive(id) {
   if (!route.path.startsWith('/create')) return false

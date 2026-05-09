@@ -1,109 +1,94 @@
 <template>
-  <aside
-    v-if="visible"
-    aria-labelledby="onboarding-hints-title"
-    class="fixed bottom-4 left-4 right-4 z-sheet max-h-[min(72vh,calc(100dvh-6rem))] overflow-y-auto rounded-2xl border border-slate-200/95 bg-white/98 p-4 shadow-xl shadow-slate-900/10 backdrop-blur-sm ring-1 ring-slate-900/5 sm:p-5 md:right-6 md:left-auto md:max-w-md"
-  >
-    <div class="h-1 shrink-0 rounded-full bg-gradient-to-r from-brand via-sky-500 to-sky-400" aria-hidden="true" />
-    <div class="mt-3 flex items-start justify-between gap-3">
-      <div class="flex items-start gap-2.5">
-        <span class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-light text-brand ring-1 ring-brand/15">
-          <Sparkles class="size-4" aria-hidden="true" />
-        </span>
-        <div>
-          <h2 id="onboarding-hints-title" class="text-sm font-extrabold tracking-tight text-slate-900">Первые шаги в OTE Manager</h2>
-          <p class="mt-1 text-xs font-medium leading-relaxed text-slate-600">
-            Коротко, куда нажать. Подсказка только для новых участников каталога; можно скрыть в любой момент.
-          </p>
-        </div>
+  <div v-if="eligible">
+    <AppModal
+      v-model="offerOpen"
+      labelledby="onboarding-offer-title"
+      accent="brand"
+      max-width-class="max-w-lg"
+      :backdrop-dismissible="false"
+    >
+      <h2 id="onboarding-offer-title" class="text-lg font-extrabold tracking-tight text-slate-900">Пройти знакомство?</h2>
+      <p class="mt-2 text-sm font-medium leading-relaxed text-slate-600">
+        Короткая экскурсия: окружения, мастер создания OTE, затем блок TeamCity в профиле и уведомления. Отдельно покажем, где указать доступ к TC: без сохранённого
+        <span class="font-bold text-slate-800">токена</span>
+        сборки через интерфейс не уйдут. Шаги — кнопками «Назад» и «Далее».
+      </p>
+      <div
+        class="mt-6 flex flex-col gap-2 border-t border-slate-100 pt-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:gap-x-3 sm:gap-y-2"
+        role="group"
+        aria-label="Действия приглашения"
+      >
+        <AppButton
+          type="button"
+          variant="ghost"
+          size="sm"
+          class="min-h-[40px] w-full shrink-0 justify-center sm:min-h-0 sm:w-auto"
+          :disabled="persistBusy"
+          :loading="persistBusy"
+          @click="skipForever"
+        >
+          Не показывать
+        </AppButton>
+        <AppButton
+          type="button"
+          variant="secondary"
+          size="sm"
+          class="min-h-[40px] w-full shrink-0 justify-center sm:min-h-0 sm:w-auto"
+          :disabled="persistBusy"
+          @click="postponeOffer"
+        >
+          Позже
+        </AppButton>
+        <AppButton
+          type="button"
+          variant="primary"
+          class="min-h-[40px] w-full shrink-0 justify-center shadow-sm sm:min-h-0 sm:w-auto"
+          :disabled="persistBusy"
+          @click="startTour"
+        >
+          Пройти знакомство
+        </AppButton>
       </div>
-    </div>
-
-    <ul class="mt-4 space-y-2.5 text-xs font-semibold text-slate-700">
-      <li class="flex gap-2">
-        <span class="font-mono font-bold text-brand">1.</span>
-        <span>
-          <NuxtLink to="/" class="text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand">Главная</NuxtLink>
-          — обзор и быстрые действия.
-        </span>
-      </li>
-      <li class="flex gap-2">
-        <span class="font-mono font-bold text-brand">2.</span>
-        <span>
-          <NuxtLink
-            to="/environments"
-            class="text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand"
-          >
-            Окружения OTE
-          </NuxtLink>
-          — список, фильтры и карточка стенда.
-        </span>
-      </li>
-      <li class="flex gap-2">
-        <span class="font-mono font-bold text-brand">3.</span>
-        <span>
-          <NuxtLink
-            to="/create"
-            class="text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand"
-          >
-            Создать OTE
-          </NuxtLink>
-          —
-          <NuxtLink
-            to="/templates"
-            class="text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand"
-          >
-            Шаблоны
-          </NuxtLink>
-          ускоряют повторные запуски.
-        </span>
-      </li>
-      <li class="flex gap-2">
-        <span class="font-mono font-bold text-brand">4.</span>
-        <span> В меню слева раздел «Быстрый запуск»: избранные и недавние шаблоны сборки.</span>
-      </li>
-      <li v-if="auth.isAdmin" class="flex gap-2">
-        <span class="font-mono font-bold text-brand">5.</span>
-        <span>
-          Для администраторов:
-          <NuxtLink to="/audit" class="text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand">Аудит</NuxtLink>
-          ,
-          <NuxtLink
-            to="/admin/users"
-            class="text-brand underline decoration-brand/30 underline-offset-2 hover:decoration-brand"
-          >
-            Пользователи
-          </NuxtLink>
-          .
-        </span>
-      </li>
-    </ul>
-
-    <div class="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
-      <AppButton type="button" variant="primary" size="sm" class="shadow-sm" :loading="busy" @click="dismiss">
-        Понятно, скрыть
-      </AppButton>
-      <span class="text-[11px] font-medium text-slate-500">Подсказка не вернётся после скрытия.</span>
-    </div>
-  </aside>
+    </AppModal>
+  </div>
 </template>
 
 <script setup>
-import { Sparkles } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useToast } from '~/composables/useToast'
 import { fetchInternalApi } from '~/composables/internalApi'
+import {
+  isOnboardingOfferPostponedSession,
+  postponeOnboardingOfferForSession,
+  runOteOnboardingTour,
+} from '~/composables/useOteOnboardingTour.js'
 import { useAuthStore } from '~/stores/auth'
 
 const auth = useAuthStore()
+const router = useRouter()
 const toast = useToast()
-const busy = ref(false)
 
-const visible = computed(() => Boolean(auth.isLoggedIn && auth.user?.showOnboardingHints))
+const offerOpen = ref(false)
+const persistBusy = ref(false)
 
-async function dismiss() {
-  if (busy.value) return
-  busy.value = true
+const eligible = computed(
+  () => Boolean(auth.isLoggedIn && auth.user?.showOnboardingHints === true && !auth.isAdmin),
+)
+
+onMounted(() => {
+  if (!import.meta.client) return
+  if (!eligible.value) return
+  if (isOnboardingOfferPostponedSession()) return
+  offerOpen.value = true
+})
+
+watch(eligible, (ok) => {
+  if (!ok) offerOpen.value = false
+})
+
+async function persistDismiss() {
+  persistBusy.value = true
   try {
     const res = await fetchInternalApi('/api/me/onboarding-hints/dismiss', { method: 'POST' })
     const text = await res.text()
@@ -117,13 +102,34 @@ async function dismiss() {
         if (raw) msg = raw.length > 240 ? `${raw.slice(0, 240)}…` : raw
       }
       toast.show(msg, 'warn')
-      return
+      return false
     }
     auth.patchUser({ showOnboardingHints: false })
+    return true
   } catch {
     toast.show('Ошибка сети', 'warn')
+    return false
   } finally {
-    busy.value = false
+    persistBusy.value = false
   }
+}
+
+function startTour() {
+  offerOpen.value = false
+  runOteOnboardingTour(router, {
+    async onTourFinished() {
+      await persistDismiss()
+    },
+  })
+}
+
+function postponeOffer() {
+  postponeOnboardingOfferForSession()
+  offerOpen.value = false
+}
+
+async function skipForever() {
+  const ok = await persistDismiss()
+  if (ok) offerOpen.value = false
 }
 </script>

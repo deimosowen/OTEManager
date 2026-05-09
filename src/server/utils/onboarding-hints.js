@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import { userHasAdminRole } from '@app-constants/rbac.js'
 import { oteDirectoryUsers, userSettings } from '../db/schema.js'
 import { getDb } from '../db/client.js'
 import { integrationUserKey } from './integrations/user-credentials.js'
@@ -54,6 +55,7 @@ export async function computeShowOnboardingHints(db, userKey, nowMs = Date.now()
  */
 export async function attachOnboardingHintsToPublicUser(db, publicUser) {
   if (!publicUser || typeof publicUser !== 'object') return publicUser
+  if (userHasAdminRole(publicUser.roles)) return { ...publicUser, showOnboardingHints: false }
   const key = integrationUserKey(publicUser)
   if (!key) return { ...publicUser, showOnboardingHints: false }
   try {

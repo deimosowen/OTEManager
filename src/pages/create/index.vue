@@ -108,7 +108,7 @@
         </div>
       </section>
 
-      <div class="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-card ring-1 ring-slate-900/5 sm:p-8">
+      <div data-tour="tour-create-template-block" class="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-card ring-1 ring-slate-900/5 sm:p-8">
         <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100/90 pb-5">
           <div class="min-w-0">
             <h2 id="create-template-heading" class="text-base font-extrabold tracking-tight text-slate-900">Шаблон сборки</h2>
@@ -226,7 +226,7 @@
 
         </div>
 
-        <div class="mt-8 rounded-2xl bg-slate-50/90 p-5 ring-1 ring-slate-900/[0.04] sm:p-6">
+        <div data-tour="tour-create-params" class="mt-8 rounded-2xl bg-slate-50/90 p-5 ring-1 ring-slate-900/[0.04] sm:p-6">
           <div class="flex flex-wrap items-start gap-3 sm:items-center sm:justify-between sm:gap-4">
             <button
               type="button"
@@ -330,7 +330,7 @@
           </div>
         </div>
 
-        <div class="mt-8 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
+        <div data-tour="tour-create-actions" class="mt-8 flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 pt-4">
           <NuxtLink
             to="/"
             class="inline-flex min-h-[40px] min-w-[100px] items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2 text-sm font-bold text-slate-600 transition hover:border-slate-300 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"

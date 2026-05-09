@@ -1,5 +1,5 @@
 <template>
-  <div v-if="auth.isLoggedIn" ref="rootRef" class="relative z-dropdown-anchor flex items-center">
+  <div v-if="auth.isLoggedIn" ref="rootRef" data-tour="tour-topbar-notifications" class="relative z-dropdown-anchor flex items-center">
     <button
       type="button"
       class="relative flex size-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-brand-light hover:text-brand"
