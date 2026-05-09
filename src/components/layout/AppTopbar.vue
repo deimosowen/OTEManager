@@ -1,6 +1,6 @@
 <template>
   <header
-    class="sticky top-0 z-[100] flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-6 shadow-sm shadow-brand/5"
+    class="sticky top-0 z-header flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-6 shadow-sm shadow-brand/5"
   >
     <NuxtLink to="/" class="flex items-center gap-2">
       <AppLogoMark :muted="true" />
@@ -10,7 +10,8 @@
     <AppNotificationsBell />
     <NuxtLink
       to="/profile"
-      class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-slate-800 transition hover:bg-brand-light"
+      title="Профиль и настройки"
+      class="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-slate-800 transition hover:bg-brand-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
     >
       <img
         v-if="auth.user?.avatarUrl"
@@ -25,13 +26,11 @@
         {{ auth.initials }}
       </span>
       <span class="max-w-[140px] truncate">{{ auth.displayName }}</span>
-      <ChevronDown class="size-3.5 text-slate-500" />
     </NuxtLink>
   </header>
 </template>
 
 <script setup>
-import { ChevronDown } from 'lucide-vue-next'
 import { useAuthStore } from '~/stores/auth'
 
 const auth = useAuthStore()

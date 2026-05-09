@@ -8,7 +8,7 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isLoggedIn: (s) => Boolean(s.user),
-    /** Роли приходят из `/api/auth/session` и SSR `event.context.oteUser` (массив кодов из БД). */
+    /** Роли — из `/api/auth/session` и SSR. `showOnboardingHints`: новые не-админы; пошаговый онбординг для администраторов не предлагается. */
     isAdmin: (s) => userHasAdminRole(s.user?.roles),
     displayName: (s) => s.user?.name || 'Гость',
     initials: (s) => {

@@ -146,7 +146,7 @@
         </section>
 
         <!-- TeamCity -->
-        <section id="profile-teamcity" class="profile-section-scroll scroll-mt-24 bg-gradient-to-r from-sky-50/[0.4] via-white to-transparent px-5 py-5 sm:px-6">
+        <section id="profile-teamcity" data-tour="tour-profile-teamcity" class="profile-section-scroll scroll-mt-24 bg-gradient-to-r from-sky-50/[0.4] via-white to-transparent px-5 py-5 sm:px-6">
           <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div class="flex items-start gap-3">
               <span

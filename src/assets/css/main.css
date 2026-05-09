@@ -10,3 +10,16 @@
     @apply min-h-screen font-sans;
   }
 }
+
+/* Подложка driver.js под шрифт приложения и чуть крупнее поле описания */
+.driver-popover.driver-popover-ote-font {
+  @apply rounded-2xl border border-slate-200 shadow-2xl;
+  max-width: min(384px, calc(100vw - 32px)) !important;
+  font-family: inherit !important;
+}
+.driver-popover.driver-popover-ote-font .driver-popover-description {
+  font-size: 0.8125rem !important;
+  line-height: 1.55 !important;
+  font-weight: 500 !important;
+  color: rgb(71 85 105) !important;
+}

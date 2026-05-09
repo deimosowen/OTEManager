@@ -20,83 +20,57 @@
     @confirm="confirmProtectToggle"
   />
 
-  <Teleport to="body">
-    <div
-      v-if="updateModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="ote-update-modal-title"
-    >
-      <div class="absolute inset-0 bg-slate-900/55 backdrop-blur-[2px]" aria-hidden="true" @click="closeUpdateOteModal" />
-      <div
-        class="relative w-full max-w-[440px] overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl ring-1 ring-slate-900/5"
-        @click.stop
-      >
-        <div class="h-1 bg-gradient-to-r from-brand via-sky-500 to-sky-400" aria-hidden="true" />
-        <div class="p-6 sm:p-7">
-          <h2 id="ote-update-modal-title" class="text-lg font-extrabold tracking-tight text-slate-900">Обновить OTE</h2>
-          <p class="mt-2 text-sm font-medium leading-relaxed text-slate-600">
-            Запускается та же сборка TeamCity, что при создании. Параметр
-            <span class="font-mono text-slate-800">metadata.tag</span> берётся с текущей OTE — существующее окружение
-            обновится по этой метке.
-          </p>
-          <label class="mt-5 block text-xs font-extrabold uppercase tracking-wide text-slate-500" for="ote-update-c1-version">
-            caseone.version
-          </label>
-          <input
-            id="ote-update-c1-version"
-            v-model="updateVersionDraft"
-            type="text"
-            autocomplete="off"
-            class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/15"
-            placeholder="например 3.2.1"
-            @keydown.enter.prevent="submitOteUpdate"
-          />
-          <div class="mt-7 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-5">
-            <AppButton variant="secondary" :disabled="updateBusy" @click="closeUpdateOteModal">Отмена</AppButton>
-            <AppButton variant="primary" :loading="updateBusy" :disabled="!updateVersionDraft.trim()" @click="submitOteUpdate">
-              Запустить
-            </AppButton>
-          </div>
-        </div>
-      </div>
+  <AppModal
+    v-model="updateModalOpen"
+    labelledby="ote-update-modal-title"
+    accent="brand"
+    :backdrop-dismissible="!updateBusy"
+  >
+    <h2 id="ote-update-modal-title" class="text-lg font-extrabold tracking-tight text-slate-900">Обновить OTE</h2>
+    <p class="mt-2 text-sm font-medium leading-relaxed text-slate-600">
+      Запускается та же сборка TeamCity, что при создании. Параметр
+      <span class="font-mono text-slate-800">metadata.tag</span> берётся с текущей OTE — существующее окружение обновится
+      по этой метке.
+    </p>
+    <div class="mt-5">
+      <AppInput
+        id="ote-update-c1-version"
+        v-model="updateVersionDraft"
+        label="caseone.version"
+        autocomplete="off"
+        placeholder="например 3.2.1"
+        @keydown.enter.prevent="submitOteUpdate"
+      />
     </div>
-  </Teleport>
+    <div class="mt-7 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-5">
+      <AppButton variant="secondary" :disabled="updateBusy" @click="closeUpdateOteModal">Отмена</AppButton>
+      <AppButton variant="primary" :loading="updateBusy" :disabled="!updateVersionDraft.trim()" @click="submitOteUpdate">
+        Запустить
+      </AppButton>
+    </div>
+  </AppModal>
 
-  <Teleport to="body">
-    <div
-      v-if="modifyDeleteDateModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="ote-modify-delete-date-title"
-    >
-      <div class="absolute inset-0 bg-slate-900/55 backdrop-blur-[2px]" aria-hidden="true" @click="closeModifyDeleteDateModal" />
-      <div
-        class="relative w-full max-w-[440px] overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl ring-1 ring-slate-900/5"
-        @click.stop
-      >
-        <div class="h-1 bg-gradient-to-r from-brand via-sky-500 to-sky-400" aria-hidden="true" />
-        <div class="p-6 sm:p-7">
-          <h2 id="ote-modify-delete-date-title" class="text-lg font-extrabold tracking-tight text-slate-900">Дата автоудаления</h2>
-          <p class="mt-2 text-sm font-medium leading-relaxed text-slate-600">
-            Можно выбрать только завтра или позже. Дата на карточке обновится, когда изменение применится в облаке.
-          </p>
-          <p class="mt-5 text-xs font-extrabold uppercase tracking-wide text-slate-500">Новая дата удаления</p>
-          <div class="mt-3">
-            <AppDateCalendar v-model="modifyDeleteDateDraft" :min="modifyDeleteDateMin" />
-          </div>
-          <div class="mt-7 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-5">
-            <AppButton variant="secondary" :disabled="modifyDeleteBusy" @click="closeModifyDeleteDateModal">Отмена</AppButton>
-            <AppButton variant="primary" :loading="modifyDeleteBusy" :disabled="!modifyDeleteDateDraft" @click="submitModifyDeleteDate">
-              Запустить
-            </AppButton>
-          </div>
-        </div>
-      </div>
+  <AppModal
+    v-model="modifyDeleteDateModalOpen"
+    labelledby="ote-modify-delete-date-title"
+    accent="brand"
+    :backdrop-dismissible="!modifyDeleteBusy"
+  >
+    <h2 id="ote-modify-delete-date-title" class="text-lg font-extrabold tracking-tight text-slate-900">Дата автоудаления</h2>
+    <p class="mt-2 text-sm font-medium leading-relaxed text-slate-600">
+      Можно выбрать только завтра или позже. Дата на карточке обновится, когда изменение применится в облаке.
+    </p>
+    <p class="mt-5 text-xs font-extrabold uppercase tracking-wide text-slate-500">Новая дата удаления</p>
+    <div class="mt-3">
+      <AppDateCalendar v-model="modifyDeleteDateDraft" :min="modifyDeleteDateMin" />
     </div>
-  </Teleport>
+    <div class="mt-7 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-5">
+      <AppButton variant="secondary" :disabled="modifyDeleteBusy" @click="closeModifyDeleteDateModal">Отмена</AppButton>
+      <AppButton variant="primary" :loading="modifyDeleteBusy" :disabled="!modifyDeleteDateDraft" @click="submitModifyDeleteDate">
+        Запустить
+      </AppButton>
+    </div>
+  </AppModal>
 
   <section
     v-if="detailCardLoading && !env"
@@ -639,7 +613,12 @@
       </div>
       <div class="mb-4 flex flex-wrap items-end gap-2">
         <div class="min-w-[140px] flex-1 sm:max-w-[200px]">
-          <AppSelect v-model="oteAuditFilterAction" label="Действие" :options="AUDIT_ACTION_FILTER_OPTIONS" />
+          <AppSelect
+            v-model="oteAuditFilterAction"
+            label="Действие"
+            :options="AUDIT_ACTION_FILTER_OPTIONS"
+            :panel-min-width-px="360"
+          />
         </div>
         <div class="flex items-end gap-1.5">
           <div>

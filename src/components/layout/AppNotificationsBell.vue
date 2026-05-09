@@ -1,5 +1,5 @@
 <template>
-  <div v-if="auth.isLoggedIn" ref="rootRef" class="relative z-[110] flex items-center">
+  <div v-if="auth.isLoggedIn" ref="rootRef" data-tour="tour-topbar-notifications" class="relative z-dropdown-anchor flex items-center">
     <button
       type="button"
       class="relative flex size-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-brand-light hover:text-brand"
@@ -21,7 +21,7 @@
       <!-- Затемнение только на мобилке. Не оборачивать панель в родителя с transform — иначе sm:fixed «прилипает» к этому родителю и визуально прыгает после анимации. -->
       <div
         v-if="open"
-        class="fixed inset-0 z-[500] bg-slate-900/25 sm:hidden"
+        class="fixed inset-0 z-notif-backdrop bg-slate-900/25 sm:hidden"
         aria-hidden="true"
         @click="open = false"
       />
@@ -36,7 +36,7 @@
         <div
           v-if="open"
           data-app-notifications-panel
-          class="fixed bottom-0 left-0 right-0 z-[510] flex max-h-[min(82vh,calc(100vh-6rem))] flex-col rounded-t-2xl border border-slate-200 bg-white shadow-2xl ring-1 ring-slate-900/10 sm:bottom-auto sm:left-auto sm:right-5 sm:top-16 sm:max-h-[min(72vh,28rem)] sm:w-[min(calc(100vw-2.5rem),22rem)] sm:rounded-2xl"
+          class="fixed bottom-0 left-0 right-0 z-notifications flex max-h-[min(82vh,calc(100vh-6rem))] flex-col rounded-t-2xl border border-slate-200 bg-white shadow-2xl ring-1 ring-slate-900/10 sm:bottom-auto sm:left-auto sm:right-5 sm:top-16 sm:max-h-[min(72vh,28rem)] sm:w-[min(calc(100vw-2.5rem),22rem)] sm:rounded-2xl"
         >
             <div class="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-3 py-3 sm:px-4">
               <p class="text-sm font-extrabold text-slate-900">Уведомления</p>

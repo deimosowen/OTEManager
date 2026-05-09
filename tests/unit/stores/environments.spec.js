@@ -22,6 +22,32 @@ describe('useEnvironmentsStore', () => {
     expect(store.filteredItems.every((e) => e.status === OTE_STATUS.STOPPED)).toBe(true)
   })
 
+  it('фильтрует по автору (runBy, в т.ч. сегменты «a / b»)', () => {
+    const store = useEnvironmentsStore()
+    store.filters.author = 'user2'
+    expect(store.filteredItems.map((e) => e.id)).toEqual(['2'])
+    store.filters.author = ''
+    store.items.push({
+      id: '99',
+      mine: false,
+      name: 'ote-grouped',
+      runBy: 'alice / bob',
+      product: 'CaseOne',
+      type: 'Linux Single',
+      status: OTE_STATUS.RUNNING,
+      instances: { ready: 1, total: 1 },
+      lastOperation: { kind: 'start', label: 'Старт' },
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      caseOneVersion: '2.31',
+      history: [],
+      lastBuild: null,
+      instancesDetail: [],
+    })
+    store.filters.author = 'bob'
+    expect(store.filteredItems.some((e) => e.id === '99')).toBe(true)
+    expect(store.filteredItems.find((e) => e.id === '99')?.name).toBe('ote-grouped')
+  })
+
   it('setRunning переключает статус и операцию', () => {
     const store = useEnvironmentsStore()
     const running = store.items.find((e) => e.status === OTE_STATUS.RUNNING)

@@ -17,7 +17,7 @@
           :id="tooltipHtmlId"
           ref="panelRef"
           role="tooltip"
-          class="fixed z-[300] overflow-hidden rounded-xl border border-slate-200/95 bg-white shadow-xl shadow-slate-900/12 ring-1 ring-slate-900/[0.04]"
+          class="fixed z-tooltip overflow-hidden rounded-xl border border-slate-200/95 bg-white shadow-xl shadow-slate-900/12 ring-1 ring-slate-900/[0.04]"
           :style="panelStyle"
           @mouseenter="onPanelEnter"
           @mouseleave="onPanelLeave"

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { $fetch } from 'ofetch'
 import { OTE_STATUS } from '~/constants/ote'
 import { createSeedEnvironments } from '~/mocks/seedEnvironments'
+import { splitOteGroupedFieldSegments } from '~/utils/ote-grouped-field-segments.js'
 
 function newId(list) {
   const nums = list.map((e) => Number(e.id)).filter((n) => !Number.isNaN(n))
@@ -74,16 +75,21 @@ export const useEnvironmentsStore = defineStore('environments', {
     items: [],
     filters: {
       query: '',
-      product: '',
+      author: '',
       status: '',
       type: '',
       onlyMine: false,
     },
   }),
   getters: {
-    productOptions: (s) => {
-      const set = new Set(s.items.map((i) => i.product).filter(Boolean))
-      return ['', ...Array.from(set).sort()]
+    authorOptions: (s) => {
+      const set = new Set()
+      for (const row of s.items) {
+        for (const seg of splitOteGroupedFieldSegments(row.runBy)) {
+          set.add(seg)
+        }
+      }
+      return ['', ...Array.from(set).sort((a, b) => a.localeCompare(b))]
     },
     typeOptions: (s) => {
       const set = new Set(s.items.map((i) => i.type).filter(Boolean))
@@ -123,7 +129,10 @@ export const useEnvironmentsStore = defineStore('environments', {
             .toLowerCase()
           if (!blob.includes(q)) return false
         }
-        if (s.filters.product && row.product !== s.filters.product) return false
+        if (s.filters.author) {
+          const segments = splitOteGroupedFieldSegments(row.runBy)
+          if (!segments.includes(s.filters.author)) return false
+        }
         if (s.filters.status && row.status !== s.filters.status) return false
         if (s.filters.type && row.type !== s.filters.type) return false
         if (s.filters.onlyMine && !row.mine) return false
@@ -193,7 +202,7 @@ export const useEnvironmentsStore = defineStore('environments', {
     resetFilters() {
       this.filters = {
         query: '',
-        product: '',
+        author: '',
         status: '',
         type: '',
         onlyMine: false,

@@ -148,6 +148,8 @@ export const userNotifications = sqliteTable(
 export const userSettings = sqliteTable('user_settings', {
   userLogin: text('user_login', { length: 256 }).primaryKey(),
   timezone: text('timezone', { length: 128 }).notNull().default('UTC'),
+  /** 1 — пользователь закрыл onboarding-подсказки; только вместе с «новым» firstSeen (см. onboarding-hints). */
+  onboardingHintsDismissed: integer('onboarding_hints_dismissed').notNull().default(0),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }),
 })
 

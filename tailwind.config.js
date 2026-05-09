@@ -9,6 +9,21 @@ export default {
   ],
   theme: {
     extend: {
+      /** Шкала слоёв: модалки, дроперы, топбар — единые имена классов вида z-modal */
+      zIndex: {
+        header: '100',
+        'dropdown-anchor': '110',
+        'app-dropdown': '100',
+        dropdown: '280',
+        tooltip: '300',
+        drawer: '220',
+        sheet: '228',
+        modal: '240',
+        'notif-backdrop': '500',
+        notifications: '510',
+        toast: '9999',
+        'elevated-popover': '10050',
+      },
       colors: {
         brand: {
           DEFAULT: '#2563EB',

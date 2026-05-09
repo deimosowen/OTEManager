@@ -34,27 +34,19 @@
     <template v-else>
       <!-- Пользователи -->
       <div v-show="tab === 'people'" class="space-y-4">
-        <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 shadow-inner sm:flex-row sm:flex-wrap sm:items-center">
-          <label class="min-w-[min(100%,260px)] flex-1 sm:max-w-md">
-            <span class="mb-1 block text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Поиск</span>
-            <input
+        <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 px-4 py-3 shadow-inner sm:flex-row sm:flex-wrap sm:items-end">
+          <div class="min-w-[min(100%,260px)] flex-1 sm:max-w-md">
+            <AppInput
               v-model="userSearch"
-              type="search"
+              native-type="search"
+              label="Поиск"
               autocomplete="off"
               placeholder="Имя, логин или email"
-              class="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none ring-brand/25 placeholder:text-slate-400 focus:border-brand focus:ring-2"
             />
-          </label>
-          <label class="w-full sm:w-56">
-            <span class="mb-1 block text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Группа</span>
-            <select
-              v-model="filterGroupIdRaw"
-              class="h-10 w-full cursor-pointer rounded-lg border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 outline-none ring-brand/25 focus:border-brand focus:ring-2"
-            >
-              <option value="">Все группы</option>
-              <option v-for="g in groups" :key="g.id" :value="String(g.id)">{{ g.name }}</option>
-            </select>
-          </label>
+          </div>
+          <div class="w-full sm:w-56">
+            <AppSelect v-model="filterGroupIdRaw" label="Группа" :options="groupFilterSelectOptions" />
+          </div>
           <p class="text-xs font-semibold text-slate-500 sm:ml-auto sm:self-end sm:pb-2">
             <span class="font-extrabold text-slate-800">{{ filteredUsers.length }}</span>
             из
@@ -230,7 +222,7 @@
     <Teleport to="body">
       <div
         v-if="panelUser"
-        class="fixed inset-0 z-[220] flex justify-end"
+        class="fixed inset-0 z-drawer flex justify-end"
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-user-panel-title"
@@ -311,7 +303,7 @@
     <Teleport to="body">
       <div
         v-if="inviteModalOpen && inviteModalGroup"
-        class="fixed inset-0 z-[228] flex items-end justify-center p-0 sm:items-center sm:p-6"
+        class="fixed inset-0 z-sheet flex items-end justify-center p-0 sm:items-center sm:p-6"
         role="dialog"
         aria-modal="true"
         aria-labelledby="group-invite-modal-title"
@@ -366,32 +358,26 @@
               </div>
 
               <div class="mt-5 grid gap-4 sm:grid-cols-2">
-                <label class="block">
-                  <span class="mb-1 flex items-center justify-between gap-2">
-                    <span class="text-xs font-extrabold uppercase tracking-wide text-slate-500">Действует, дней</span>
-                    <span class="text-[11px] font-bold text-slate-400">1–365</span>
-                  </span>
-                  <input
-                    v-model.number="inviteExpiresDays"
-                    type="number"
-                    min="1"
-                    max="365"
-                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-center text-sm font-extrabold text-slate-900 outline-none ring-brand/20 transition focus:border-brand focus:ring-2"
-                  />
-                </label>
-                <label class="block">
-                  <span class="mb-1 flex items-center justify-between gap-2">
-                    <span class="text-xs font-extrabold uppercase tracking-wide text-slate-500">Лимит активаций</span>
-                    <span class="text-[11px] font-bold text-slate-400">сколько раз</span>
-                  </span>
-                  <input
-                    v-model.number="inviteMaxUses"
-                    type="number"
-                    min="1"
-                    max="5000"
-                    class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-center text-sm font-extrabold text-slate-900 outline-none ring-brand/20 transition focus:border-brand focus:ring-2"
-                  />
-                </label>
+                <AppInput
+                  :model-value="inviteExpiresDays"
+                  native-type="number"
+                  label="Действует, дней"
+                  label-title="Допустимо от 1 до 365 дней"
+                  min="1"
+                  max="365"
+                  input-class="text-center tabular-nums font-extrabold"
+                  @update:model-value="onInviteExpiresDays"
+                />
+                <AppInput
+                  :model-value="inviteMaxUses"
+                  native-type="number"
+                  label="Лимит активаций"
+                  label-title="Сколько раз можно перейти по ссылке (1–5000)"
+                  min="1"
+                  max="5000"
+                  input-class="text-center tabular-nums font-extrabold"
+                  @update:model-value="onInviteMaxUses"
+                />
               </div>
             </template>
 
@@ -408,7 +394,7 @@
                   <input
                     readonly
                     :value="inviteModalResult.inviteUrl"
-                    class="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 font-mono text-[11px] font-semibold text-slate-800 shadow-inner"
+                    class="min-h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-[11px] font-semibold text-slate-800 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15"
                     @focus="selectInviteUrlField"
                   />
                   <AppButton variant="primary" class="shrink-0 font-extrabold sm:px-5" @click="copyInviteModalUrl">Копировать</AppButton>
@@ -491,6 +477,14 @@ const roleDefinitions = ref(/** @type {{ code: string, label: string }[]} */ ([]
 const userSearch = ref('')
 const filterGroupIdRaw = ref('')
 
+const groupFilterSelectOptions = computed(() => [
+  { value: '', label: 'Все группы' },
+  ...(groups.value || []).map((g) => ({
+    value: String(g.id),
+    label: String(g.name || ''),
+  })),
+])
+
 const filteredUsers = computed(() => {
   let list = users.value.slice()
   const gidRaw = filterGroupIdRaw.value
@@ -534,6 +528,28 @@ const creatingInvite = ref(false)
 const inviteModalResult = ref(
   /** @type {{ inviteUrl?: string, expiresAt?: string, maxUses?: number, groupId?: number, groupName?: string } | null} */ (null),
 )
+
+/** @param {string | number} v */
+function onInviteExpiresDays(v) {
+  if (v === '' || v == null) {
+    inviteExpiresDays.value = 7
+    return
+  }
+  const n = Number(v)
+  if (!Number.isFinite(n)) return
+  inviteExpiresDays.value = Math.min(365, Math.max(1, Math.floor(n)))
+}
+
+/** @param {string | number} v */
+function onInviteMaxUses(v) {
+  if (v === '' || v == null) {
+    inviteMaxUses.value = 1
+    return
+  }
+  const n = Number(v)
+  if (!Number.isFinite(n)) return
+  inviteMaxUses.value = Math.min(5000, Math.max(1, Math.floor(n)))
+}
 
 const panelUser = computed(() => users.value.find((x) => x.userKey === panelUserKey.value) ?? null)
 

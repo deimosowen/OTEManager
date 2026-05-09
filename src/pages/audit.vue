@@ -7,7 +7,12 @@
 
     <div class="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-card">
       <div class="min-w-[160px] flex-1 sm:max-w-[220px]">
-        <AppSelect v-model="filterAction" label="Действие" :options="AUDIT_ACTION_FILTER_OPTIONS" />
+        <AppSelect
+          v-model="filterAction"
+          label="Действие"
+          :options="AUDIT_ACTION_FILTER_OPTIONS"
+          :panel-min-width-px="360"
+        />
       </div>
       <div class="flex items-end gap-1.5">
         <div>
@@ -154,11 +159,20 @@ const APP_GROUP_AUDIT_ACTIONS = new Set([
   AUDIT_ACTION.APP_GROUP_DELETE,
 ])
 
+/** События каталога пользователей: в `ote_resource_id` лежит userKey (логин / email), не id OTE. */
+const CATALOG_USER_AUDIT_ACTIONS = new Set([
+  AUDIT_ACTION.USER_ROLES_UPDATE,
+  AUDIT_ACTION.USER_GROUP_UPDATE,
+])
+
 /** Ссылка из колонки «Ресурс»: шаблоны, запрос создания OTE в TC, группы каталога, иначе карточка OTE */
 function resourceHref(oteResourceId, actionCode) {
   if (!oteResourceId) return '/'
   const s = String(oteResourceId)
   const code = String(actionCode || '')
+  if (CATALOG_USER_AUDIT_ACTIONS.has(code)) {
+    return '/admin/users?tab=people'
+  }
   if (s.startsWith(AUDIT_APP_GROUP_RESOURCE_PREFIX)) {
     return '/admin/users?tab=groups'
   }
