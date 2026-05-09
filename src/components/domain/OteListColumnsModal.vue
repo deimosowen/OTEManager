@@ -1,90 +1,83 @@
 <template>
-  <Teleport to="body">
-    <div
-      v-if="modelValue"
-      class="fixed inset-0 z-[240] flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="ote-list-columns-title"
-    >
-      <div class="absolute inset-0 bg-slate-900/55 backdrop-blur-[2px]" aria-hidden="true" @click="close" />
-      <div
-        class="relative max-h-[min(90vh,720px)] w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl ring-1 ring-slate-900/5"
-        @click.stop
-      >
-        <div class="h-1 bg-gradient-to-r from-teal-500 via-brand to-violet-500" aria-hidden="true" />
-        <div class="max-h-[min(90vh,720px)] overflow-y-auto p-6 sm:p-7">
-          <h2 id="ote-list-columns-title" class="text-lg font-extrabold tracking-tight text-slate-900">Колонки списка OTE</h2>
-          <p class="mt-2 text-sm font-medium leading-relaxed text-slate-600">
-            Отметьте, что показывать, и перетащите строки за иконку слева, чтобы изменить порядок.
-          </p>
+  <AppModal
+    :model-value="modelValue"
+    labelledby="ote-list-columns-title"
+    accent="teal"
+    max-width-class="max-w-lg"
+    panel-class="max-h-[min(90vh,720px)]"
+    content-class="max-h-[min(90vh,720px)] overflow-y-auto p-6 sm:p-7"
+    :backdrop-dismissible="!saving"
+    @update:model-value="emit('update:modelValue', $event)"
+  >
+    <h2 id="ote-list-columns-title" class="text-lg font-extrabold tracking-tight text-slate-900">Колонки списка OTE</h2>
+    <p class="mt-2 text-sm font-medium leading-relaxed text-slate-600">
+      Отметьте, что показывать, и перетащите строки за иконку слева, чтобы изменить порядок.
+    </p>
 
-          <fieldset class="mt-5 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3 sm:px-4">
-            <legend class="sr-only">Отображение сгруппированных значений</legend>
-            <p class="text-xs font-extrabold uppercase tracking-wide text-slate-500">Несколько ВМ в одной OTE</p>
-            <p class="mt-1 text-xs font-medium leading-relaxed text-slate-600">
-              Для полей автор, дата удаления, версии и метки: как показывать несколько значений.
-            </p>
-            <div class="mt-3 flex flex-col gap-2">
-              <label class="flex cursor-pointer items-start gap-2.5 rounded-lg bg-white px-2.5 py-2 ring-1 ring-slate-100">
-                <input v-model="localGroupedLayout" type="radio" :value="GROUP_JOIN" class="mt-1 size-4 accent-brand" />
-                <span class="text-sm font-semibold text-slate-800">Одна строка (через « / »)</span>
-              </label>
-              <label class="flex cursor-pointer items-start gap-2.5 rounded-lg bg-white px-2.5 py-2 ring-1 ring-slate-100">
-                <input v-model="localGroupedLayout" type="radio" :value="GROUP_LINES" class="mt-1 size-4 accent-brand" />
-                <span class="text-sm font-semibold text-slate-800">По строкам (каждое значение с новой строки)</span>
-              </label>
-            </div>
-          </fieldset>
-
-          <p v-if="errorText" class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-900">
-            {{ errorText }}
-          </p>
-
-          <ul class="mt-5 space-y-1.5" role="list">
-            <li
-              v-for="(item, index) in localItems"
-              :key="item.id"
-              class="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/90 px-2 py-2 sm:px-3"
-              :class="dragIndex === index ? 'ring-2 ring-brand/40' : ''"
-              draggable="true"
-              @dragstart="onDragStart(index, $event)"
-              @dragover.prevent="onDragOver(index, $event)"
-              @drop="onDrop(index)"
-              @dragend="onDragEnd"
-            >
-              <span
-                class="flex size-8 shrink-0 cursor-grab items-center justify-center rounded-lg text-slate-400 active:cursor-grabbing"
-                aria-hidden="true"
-                title="Перетащить"
-              >
-                <GripVertical class="size-4" />
-              </span>
-              <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
-                <input
-                  v-model="item.visible"
-                  type="checkbox"
-                  class="size-4 shrink-0 accent-brand"
-                  :disabled="item.id === requiredId"
-                />
-                <span class="min-w-0 flex-1 text-sm font-bold text-slate-900">{{ labelFor(item.id) }}</span>
-              </label>
-            </li>
-          </ul>
-
-          <div class="mt-7 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-5">
-            <AppButton type="button" variant="secondary" :disabled="saving" @click="close">Отмена</AppButton>
-            <AppButton type="button" variant="primary" :loading="saving" @click="save">Сохранить</AppButton>
-          </div>
-        </div>
+    <fieldset class="mt-5 rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3 sm:px-4">
+      <legend class="sr-only">Отображение сгруппированных значений</legend>
+      <p class="text-xs font-extrabold uppercase tracking-wide text-slate-500">Несколько ВМ в одной OTE</p>
+      <p class="mt-1 text-xs font-medium leading-relaxed text-slate-600">
+        Для полей автор, дата удаления, версии и метки: как показывать несколько значений.
+      </p>
+      <div class="mt-3 flex flex-col gap-2">
+        <label class="flex cursor-pointer items-start gap-2.5 rounded-lg bg-white px-2.5 py-2 ring-1 ring-slate-100">
+          <input v-model="localGroupedLayout" type="radio" :value="GROUP_JOIN" class="mt-1 size-4 accent-brand" />
+          <span class="text-sm font-semibold text-slate-800">Одна строка (через « / »)</span>
+        </label>
+        <label class="flex cursor-pointer items-start gap-2.5 rounded-lg bg-white px-2.5 py-2 ring-1 ring-slate-100">
+          <input v-model="localGroupedLayout" type="radio" :value="GROUP_LINES" class="mt-1 size-4 accent-brand" />
+          <span class="text-sm font-semibold text-slate-800">По строкам (каждое значение с новой строки)</span>
+        </label>
       </div>
+    </fieldset>
+
+    <p v-if="errorText" class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-900">
+      {{ errorText }}
+    </p>
+
+    <ul class="mt-5 space-y-1.5" role="list">
+      <li
+        v-for="(item, index) in localItems"
+        :key="item.id"
+        class="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/90 px-2 py-2 sm:px-3"
+        :class="dragIndex === index ? 'ring-2 ring-brand/40' : ''"
+        draggable="true"
+        @dragstart="onDragStart(index, $event)"
+        @dragover.prevent="onDragOver(index, $event)"
+        @drop="onDrop(index)"
+        @dragend="onDragEnd"
+      >
+        <span
+          class="flex size-8 shrink-0 cursor-grab items-center justify-center rounded-lg text-slate-400 active:cursor-grabbing"
+          aria-hidden="true"
+          title="Перетащить"
+        >
+          <GripVertical class="size-4" />
+        </span>
+        <label class="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+          <input
+            v-model="item.visible"
+            type="checkbox"
+            class="size-4 shrink-0 accent-brand"
+            :disabled="item.id === requiredId"
+          />
+          <span class="min-w-0 flex-1 text-sm font-bold text-slate-900">{{ labelFor(item.id) }}</span>
+        </label>
+      </li>
+    </ul>
+
+    <div class="mt-7 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-5">
+      <AppButton type="button" variant="secondary" :disabled="saving" @click="close">Отмена</AppButton>
+      <AppButton type="button" variant="primary" :loading="saving" @click="save">Сохранить</AppButton>
     </div>
-  </Teleport>
+  </AppModal>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
 import { GripVertical } from 'lucide-vue-next'
+import AppModal from '~/components/ui/AppModal.vue'
 import {
   OTE_YC_GROUPED_VALUE_JOIN_SLASH,
   OTE_YC_GROUPED_VALUE_MULTI_LINE,

@@ -3,7 +3,7 @@
     <Transition name="toast">
       <div
         v-if="visible"
-        class="fixed bottom-7 right-7 z-[9999] flex min-w-[260px] items-center gap-3 rounded-[10px] bg-slate-900 px-5 py-3.5 text-sm font-semibold text-white shadow-2xl"
+        class="fixed bottom-7 right-7 z-toast flex min-w-[260px] items-center gap-3 rounded-[10px] bg-slate-900 px-5 py-3.5 text-sm font-semibold text-white shadow-2xl"
         :class="borderClass"
       >
         <component :is="icon" class="size-[18px] shrink-0" />

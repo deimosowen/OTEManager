@@ -1,6 +1,6 @@
 <template>
   <header
-    class="sticky top-0 z-[100] flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-6 shadow-sm shadow-brand/5"
+    class="sticky top-0 z-header flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-6 shadow-sm shadow-brand/5"
   >
     <NuxtLink to="/" class="flex items-center gap-2">
       <AppLogoMark :muted="true" />

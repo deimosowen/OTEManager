@@ -20,7 +20,7 @@
         ref="buttonRef"
         type="button"
         :disabled="!options.length"
-        class="flex w-full items-center gap-2 rounded-xl border border-slate-200/95 bg-white px-3.5 py-2.5 pr-10 text-left text-sm text-slate-800 shadow-sm ring-1 ring-slate-900/[0.04] transition hover:border-slate-300 hover:shadow-md focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none"
+        class="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 pr-10 text-left text-sm text-slate-800 transition hover:border-slate-300 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
         :aria-expanded="open ? 'true' : 'false'"
         aria-haspopup="listbox"
         :aria-labelledby="ariaLabelledBy"
@@ -53,7 +53,7 @@
             ref="panelRef"
             role="listbox"
             :aria-labelledby="ariaLabelledBy"
-            class="fixed z-[280] overflow-auto rounded-xl border border-slate-200/95 bg-white py-1 shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/[0.04]"
+            class="fixed z-dropdown overflow-auto rounded-xl border border-slate-200/95 bg-white py-1 shadow-xl shadow-slate-900/10 ring-1 ring-slate-900/[0.04]"
             :style="panelStyle"
           >
             <button
@@ -62,7 +62,7 @@
               type="button"
               role="option"
               :aria-selected="isSelected(opt) ? 'true' : 'false'"
-              class="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm transition hover:bg-slate-50"
+              class="flex w-full items-start gap-2 px-3.5 py-2.5 text-left text-sm transition hover:bg-slate-50"
               :class="
                 isSelected(opt)
                   ? 'bg-gradient-to-r from-brand/[0.08] to-sky-50/50 font-bold text-brand-dark'
@@ -70,7 +70,7 @@
               "
               @click="choose(opt)"
             >
-              <span class="min-w-0 flex-1 truncate">{{ opt.label }}</span>
+              <span class="min-w-0 flex-1 whitespace-normal break-words leading-snug">{{ opt.label }}</span>
               <PersonalTemplateBadge v-if="opt.isPersonal" />
             </button>
           </div>
@@ -100,6 +100,15 @@ const props = defineProps({
   noOptionsMessage: { type: String, default: 'Нет вариантов' },
   /** id внешнего заголовка для aria-labelledby, если label не задан. */
   labelledBy: { type: String, default: '' },
+  /**
+   * Минимальная ширина выпадающей панели (px): для длинных подписей, когда кнопка узкая (фильтр «Действие» в аудите).
+   * Не задано — совпадает с шириной кнопки.
+   */
+  panelMinWidthPx: { type: Number, default: undefined },
+  /**
+   * Максимум высоты списка (px). По умолчанию ~до ⅔ высоты окна, но не больше 480.
+   */
+  panelMaxHeightPx: { type: Number, default: undefined },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -116,7 +125,7 @@ const panelStyle = ref({
   top: '0px',
   left: '0px',
   width: '240px',
-  maxHeight: 'min(320px, 50vh)',
+  maxHeight: '420px',
 })
 
 function valueKey(v) {
@@ -141,11 +150,22 @@ function updatePanelPosition() {
   if (!btn) return
   const r = btn.getBoundingClientRect()
   const pad = 8
-  const maxH = Math.min(320, Math.max(160, window.innerHeight - r.bottom - pad))
+  const minW =
+    props.panelMinWidthPx != null && Number.isFinite(props.panelMinWidthPx)
+      ? Math.max(120, props.panelMinWidthPx)
+      : undefined
+  const widthPx = minW != null ? Math.round(Math.max(r.width, minW)) : Math.round(r.width)
+  const defaultCap = Math.min(480, Math.max(240, Math.floor(window.innerHeight * 0.65)))
+  const cap =
+    props.panelMaxHeightPx != null && Number.isFinite(props.panelMaxHeightPx)
+      ? Math.max(160, props.panelMaxHeightPx)
+      : defaultCap
+  const maxH = Math.min(cap, Math.max(160, Math.floor(window.innerHeight - r.bottom - pad)))
+  const maxLeft = window.innerWidth - widthPx - pad
   panelStyle.value = {
     top: `${Math.round(r.bottom + 4)}px`,
-    left: `${Math.round(Math.max(pad, Math.min(r.left, window.innerWidth - r.width - pad)))}px`,
-    width: `${Math.round(r.width)}px`,
+    left: `${Math.round(Math.max(pad, Math.min(r.left, maxLeft)))}px`,
+    width: `${widthPx}px`,
     maxHeight: `${maxH}px`,
   }
 }

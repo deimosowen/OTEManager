@@ -13,7 +13,7 @@
       <div
         ref="panelRef"
         v-show="open"
-        class="fixed z-[100] min-w-[200px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl"
+        class="fixed z-app-dropdown min-w-[200px] rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl"
         :style="panelStyle"
         role="menu"
         @mouseenter="cancelClose"

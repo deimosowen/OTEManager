@@ -41,7 +41,7 @@
     <div
       v-show="floatingOpen && isPersonalRow"
       :style="panelStyleInline"
-      class="fixed z-[10050] max-w-[320px] rounded-xl border border-slate-200/95 bg-white p-3 shadow-card-md ring-1 ring-slate-900/8"
+      class="fixed z-elevated-popover max-w-[320px] rounded-xl border border-slate-200/95 bg-white p-3 shadow-card-md ring-1 ring-slate-900/8"
       role="tooltip"
       @mouseenter="onPanelEnter"
       @mouseleave="onPanelLeave"
@@ -51,7 +51,7 @@
     <div
       v-show="floatingOpen && !isPersonalRow"
       :style="panelStyleInline"
-      class="fixed z-[10050] max-h-[min(280px,calc(100vh-24px))] overflow-y-auto rounded-xl border border-slate-200/95 bg-white p-2.5 shadow-card-md ring-1 ring-slate-900/8"
+      class="fixed z-elevated-popover max-h-[min(280px,calc(100vh-24px))] overflow-y-auto rounded-xl border border-slate-200/95 bg-white p-2.5 shadow-card-md ring-1 ring-slate-900/8"
       role="tooltip"
       @mouseenter="onPanelEnter"
       @mouseleave="onPanelLeave"
