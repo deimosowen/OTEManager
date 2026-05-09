@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   publish:
@@ -74,3 +74,22 @@ jobs:
           docker tag "${IMAGE}:${VERSION}" "${IMAGE}:latest"
           docker push "${IMAGE}:${VERSION}"
           docker push "${IMAGE}:latest"
+
+      - name: GitHub Release
+        if: steps.meta.outputs.changed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.meta.outputs.version }}
+          name: v${{ steps.meta.outputs.version }}
+          generate_release_notes: true
+          body: |
+            ### Образ Docker Hub
+
+            После сборки этого коммита в реестре доступны теги **`:${{ steps.meta.outputs.version }}`** и **`:latest`**.
+
+            - [Страница образа на Docker Hub](https://hub.docker.com/r/deimosowen/ote-manager)
+            - [Теги](https://hub.docker.com/r/deimosowen/ote-manager/tags)
+
+            ```bash
+            docker pull deimosowen/ote-manager:${{ steps.meta.outputs.version }}
+            ```
