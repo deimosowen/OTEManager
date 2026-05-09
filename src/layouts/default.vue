@@ -18,5 +18,6 @@
       </main>
     </div>
     <AppToastHost />
+    <AppOnboardingHints />
   </div>
 </template>
