@@ -55,7 +55,7 @@ export const AUTOMATION_TUTORIAL_SAMPLE_GRAPH = {
         kind: 'action',
         variant: 'stop_mine',
         iconKey: 'PowerOff',
-        title: 'Остановить мои ВМ',
+        title: 'Остановить ВМ',
         subtitle: 'Мягкое выключение подходящих ВМ',
         tutorialTourAnchor: A.actionStop,
       },

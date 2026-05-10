@@ -32,7 +32,20 @@
 
       <div
         class="automation-block-config-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-6 pb-4 sm:px-7"
+        @focusin.capture="onSubstFieldFocusIn"
       >
+      <AutomationSubstitutionChips
+        v-if="substitutionGroups.length"
+        class="mb-4"
+        :groups="substitutionGroups"
+        @insert="insertSubstitutionSnippet"
+      />
+      <p
+        v-else-if="substitutionPlaceholderHint"
+        class="mb-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/90 px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-500"
+      >
+        Подстановки из предыдущих шагов появятся здесь после того, как на холсте соедините этот блок с блоками, у которых есть выходы (условие, HTTP, шаблон, ВМ и т.д.).
+      </p>
       <!-- Расписание: в текстах только то, что нужно пользователю (без деталей реализации). -->
       <div v-if="modalKind === 'schedule'" class="space-y-5">
         <p class="rounded-xl bg-slate-50 px-3 py-2.5 text-xs font-medium leading-relaxed text-slate-600 ring-1 ring-slate-100">
@@ -154,10 +167,6 @@
 
       <!-- Условие If/Else: ветка «Да»/«Нет» по снимку каталога YC на момент запуска -->
       <div v-else-if="modalKind === 'if_else'" class="space-y-4">
-        <p class="text-xs font-medium leading-relaxed text-slate-500">
-          При запуске сценария проверяется список сред вашей группы (как на странице OTE). Верхний выход — «Да»,
-          нижний — «Нет». Для «Есть/нет в каталоге» учитываются те же отборы, что для автора и тега.
-        </p>
         <AppInput
           v-model="ifElseCfg.blockTitle"
           label="Название блока на холсте"
@@ -193,9 +202,6 @@
 
       <!-- Уведомление в колокольчик -->
       <div v-else-if="modalKind === 'notify_bell'" class="space-y-4">
-        <p class="text-xs font-medium leading-relaxed text-slate-500">
-          Сообщение появится в списке уведомлений (иконка колокольчика в шапке). Когда движок сценариев будет запускать блок, он создаст такое же уведомление для текущего пользователя.
-        </p>
         <AppInput
           v-model="notifyBell.title"
           label="Заголовок"
@@ -222,12 +228,7 @@
       <!-- Ожидание завершения сборки TeamCity (после постановки в очередь) -->
       <div v-else-if="modalKind === 'wait_teamcity'" class="space-y-4">
         <p class="text-xs font-medium leading-relaxed text-slate-500">
-          Соединяйте
-          <span class="font-bold text-slate-700">вход</span>
-          только с блоком, который ставит сборку в TeamCity: «Создать из шаблона» или старт/стоп «моих» ВМ. Дальше
-          можно вести, например, в колокольчик: опрашиваем REST TeamCity, пока сборка не перейдёт в завершённое
-          состояние (успех — ветка «Успешно», ошибка, отмена или таймаут — «Ошибка»). Несколько сборок с
-          предыдущего шага ждутся все сразу: «Успешно» только если каждая завершилась успехом.
+          Вход соедините с блоком, который ставит сборку в TeamCity («Создать из шаблона» или запуск/остановка ВМ).
         </p>
         <AppInput
           v-model="waitTcCfg.blockTitle"
@@ -245,9 +246,6 @@
 
       <!-- Шаблон создания OTE (как на странице создания: список + параметры в сценарии) -->
       <div v-else-if="modalKind === 'create_template'" class="space-y-4">
-        <p class="text-xs font-medium leading-relaxed text-slate-500">
-          Шаблоны и доступ такие же, как при обычном создании OTE. Значения полей ниже сохраняются в сценарии и подставляются при каждом запуске блока.
-        </p>
         <div
           v-if="createTplFetchError"
           class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800"
@@ -294,6 +292,80 @@
         </template>
       </div>
 
+      <!-- Запуск / остановка ВМ -->
+      <div v-else-if="modalKind === 'vm_power'" class="space-y-4">
+        <AppInput
+          v-model="vmPower.blockTitle"
+          label="Название блока на холсте"
+          placeholder="Например: Запуск ВМ"
+          native-type="text"
+        />
+        <AppSelect
+          v-model="vmPower.targetMode"
+          label="Кого затронуть"
+          :options="VM_POWER_TARGET_OPTIONS"
+          panel-max-height-px="240"
+        />
+        <AppInput
+          v-show="vmPower.targetMode === 'tag'"
+          v-model="vmPower.tagValue"
+          label="Имя среды (тег)"
+          placeholder="Например: demo-staging"
+          native-type="text"
+        />
+      </div>
+
+      <!-- HTTP-запрос -->
+      <div v-else-if="modalKind === 'http_request'" class="space-y-4">
+        <AppInput
+          v-model="httpReq.blockTitle"
+          label="Название блока на холсте"
+          placeholder="Например: Вебхук статуса"
+          native-type="text"
+        />
+        <div class="grid gap-3 sm:grid-cols-3">
+          <AppSelect v-model="httpReq.method" label="Метод" :options="HTTP_METHOD_OPTIONS" panel-max-height-px="280" />
+          <div class="sm:col-span-2">
+            <AppInput v-model="httpReq.timeoutMs" label="Таймаут (мс)" placeholder="30000" native-type="text" />
+          </div>
+        </div>
+        <AppInput v-model="httpReq.url" label="URL" placeholder="https://api.example.com/hook" native-type="text" />
+        <div>
+          <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs font-extrabold uppercase tracking-wide text-slate-400">Заголовки</span>
+            <AppButton type="button" variant="secondary" size="sm" @click="addHttpHeaderRow">
+              <Plus class="size-4 shrink-0" stroke-width="2" />
+              Добавить
+            </AppButton>
+          </div>
+          <div class="space-y-2">
+            <div v-for="(h, idx) in httpReq.headers" :key="idx" class="flex flex-wrap gap-2">
+              <AppInput v-model="h.key" class="min-w-[140px] flex-1" label="Key" placeholder="Authorization" native-type="text" />
+              <AppInput v-model="h.value" class="min-w-[160px] flex-[2]" label="Value" placeholder="Bearer …" native-type="text" />
+              <div class="flex items-end">
+                <button
+                  type="button"
+                  class="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                  aria-label="Удалить заголовок"
+                  @click="removeHttpHeaderRow(idx)"
+                >
+                  <Trash2 class="size-4" stroke-width="2" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label class="mb-1.5 block text-sm font-bold text-slate-800">Тело запроса</label>
+          <textarea
+            v-model="httpReq.body"
+            rows="5"
+            class="w-full resize-y rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 font-mono text-sm text-slate-800 placeholder:text-slate-300 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15"
+            placeholder="Только для POST/PUT/PATCH/DELETE"
+          />
+        </div>
+      </div>
+
       <p v-if="errorHint" class="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 ring-1 ring-rose-100">
         {{ errorHint }}
       </p>
@@ -314,6 +386,7 @@ import {
   Bell,
   CalendarClock,
   GitBranch,
+  Globe,
   Layers,
   Play,
   Plus,
@@ -325,13 +398,15 @@ import {
   Trash2,
   Zap,
 } from 'lucide-vue-next'
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import AppButton from '~/components/ui/AppButton.vue'
 import AppInput from '~/components/ui/AppInput.vue'
 import AppModal from '~/components/ui/AppModal.vue'
 import AppSelect from '~/components/ui/AppSelect.vue'
+import AutomationSubstitutionChips from '~/components/automation/AutomationSubstitutionChips.vue'
 import AutomationTimePair from '~/components/automation/AutomationTimePair.vue'
 import { useManualHomeLaunch } from '~/composables/useManualHomeLaunch.js'
+import { useToast } from '~/composables/useToast'
 import { useUserTimeFormat } from '~/composables/useUserTimeFormat.js'
 import { formatTimezoneShortRu } from '~/constants/automation-schedule.js'
 import {
@@ -340,6 +415,7 @@ import {
   IF_ELSE_TAG_SCOPE_OPTIONS,
   normalizeIfElseConfig,
 } from '~/constants/automation-if-else.js'
+import { VM_POWER_TARGET_OPTIONS, normalizeVmPowerConfig } from '~/constants/automation-vm-power.js'
 import { normalizeWaitTeamCityConfig } from '~/constants/automation-wait-teamcity.js'
 import {
   MANUAL_HOME_ICON_OPTIONS,
@@ -348,9 +424,11 @@ import {
   normalizeManualHomeConfig,
 } from '~/constants/automation-manual-home.js'
 import { useAuthStore } from '~/stores/auth'
+import { buildUpstreamSubstitutionGroups } from '~/utils/automation-substitution-catalog.js'
 import { sortTemplatesForCreate } from '~/utils/ote-create-templates-sort.js'
 
 const auth = useAuthStore()
+const toast = useToast()
 const { manualHomeLaunch } = useManualHomeLaunch()
 const { timeZone } = useUserTimeFormat()
 
@@ -381,6 +459,15 @@ const WEEKDAY_OPTIONS = [
 
 const SCHEDULE_TIMES_MAX = 12
 
+const HTTP_METHOD_OPTIONS = [
+  { value: 'GET', label: 'GET' },
+  { value: 'POST', label: 'POST' },
+  { value: 'PUT', label: 'PUT' },
+  { value: 'PATCH', label: 'PATCH' },
+  { value: 'DELETE', label: 'DELETE' },
+  { value: 'HEAD', label: 'HEAD' },
+]
+
 const WAIT_TC_TIMEOUT_OPTIONS = [
   { value: '15', label: '15 минут' },
   { value: '30', label: '30 минут' },
@@ -405,6 +492,11 @@ const props = defineProps({
   mode: { type: String, default: 'add' },
   /** Конфигурация блока при редактировании */
   initialConfig: { type: Object, default: null },
+  /** Узлы Vue Flow (для подстановок из предков) */
+  graphNodes: { type: Array, default: () => [] },
+  graphEdges: { type: Array, default: () => [] },
+  /** id узла, для которого открыта модалка — цель обхода рёбер «вверх» */
+  substitutionTargetNodeId: { type: String, default: null },
 })
 
 const emit = defineEmits(['update:modelValue', 'confirm'])
@@ -416,11 +508,77 @@ const openProxy = computed({
 
 const modalKind = computed(() => props.paletteItem?.configModal || '')
 
+const SUBSTITUTION_MODAL_KINDS = new Set(['notify_bell', 'create_template', 'http_request', 'vm_power', 'if_else'])
+
+const substitutionGroups = computed(() => {
+  if (!SUBSTITUTION_MODAL_KINDS.has(modalKind.value)) return []
+  return buildUpstreamSubstitutionGroups(
+    props.graphNodes || [],
+    props.graphEdges || [],
+    props.substitutionTargetNodeId,
+  )
+})
+
+/** Нет связей к блокам с выходами — показываем короткую подсказку вместо пустого места */
+const substitutionPlaceholderHint = computed(
+  () => SUBSTITUTION_MODAL_KINDS.has(modalKind.value) && substitutionGroups.value.length === 0,
+)
+
+/** Последнее поле ввода в модалке (клик по чипу уводит фокус — без этого вставка не сработает). */
+const lastSubstField = ref(/** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (null))
+
+/** @param {FocusEvent} ev */
+function onSubstFieldFocusIn(ev) {
+  const t = ev.target
+  if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) {
+    lastSubstField.value = t
+  }
+}
+
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (!open) lastSubstField.value = null
+  },
+)
+
+/** @param {string} snippet */
+function insertSubstitutionSnippet(snippet) {
+  const root = document.querySelector('.automation-block-config-scroll')
+  let ta = lastSubstField.value
+  if (!ta || !root?.contains(ta)) {
+    const ae = document.activeElement
+    if (
+      ae instanceof HTMLInputElement ||
+      ae instanceof HTMLTextAreaElement
+    ) {
+      ta = ae
+    }
+  }
+  if (!ta || !root?.contains(ta)) {
+    toast.show('Кликните сначала в поле ввода (заголовок, URL, тело запроса…), затем снова на подстановку.', 'info')
+    return
+  }
+  const v0 = String(ta.value || '')
+  const start = typeof ta.selectionStart === 'number' ? ta.selectionStart : v0.length
+  const end = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : start
+  const next = v0.slice(0, start) + snippet + v0.slice(end)
+  ta.value = next
+  ta.dispatchEvent(new Event('input', { bubbles: true }))
+  const pos = start + snippet.length
+  if (typeof ta.setSelectionRange === 'function') ta.setSelectionRange(pos, pos)
+  const field = ta
+  void nextTick(() => {
+    field.focus()
+    if (typeof field.setSelectionRange === 'function') field.setSelectionRange(pos, pos)
+  })
+}
+
 const primaryActionLabel = computed(() => (props.mode === 'edit' ? 'Сохранить' : 'Добавить на холст'))
 
 const modalMaxWidthClass = computed(() => {
   const k = modalKind.value
-  if (k === 'create_template') return 'max-w-[640px]'
+  if (k === 'create_template' || k === 'http_request' || k === 'vm_power') return 'max-w-[640px]'
   if (k === 'manual' || k === 'if_else') return 'max-w-[560px]'
   return 'max-w-[480px]'
 })
@@ -449,7 +607,11 @@ const headerIcon = computed(() => {
     Bell,
     CalendarClock,
     GitBranch,
+    Globe,
+    Play,
     Plus,
+    Power,
+    PowerOff,
     Timer,
   }
   return map[key] || Layers
@@ -474,6 +636,39 @@ const createTplDetailLoading = ref(false)
 const createTplParamOverrides = reactive(/** @type {Record<string, string>} */ ({}))
 /** Сохранённые в сценарии переопределения — подмешиваются к умолчаниям шаблона при открытии */
 const createTplStickyOverrides = reactive(/** @type {Record<string, string>} */ ({}))
+
+const httpReq = reactive({
+  blockTitle: 'HTTP-запрос',
+  method: 'GET',
+  url: '',
+  /** @type {{ key: string, value: string }[]} */
+  headers: [{ key: '', value: '' }],
+  body: '',
+  timeoutMs: '30000',
+})
+
+function resetHttpReq() {
+  httpReq.blockTitle = 'HTTP-запрос'
+  httpReq.method = 'GET'
+  httpReq.url = ''
+  httpReq.headers = [{ key: '', value: '' }]
+  httpReq.body = ''
+  httpReq.timeoutMs = '30000'
+}
+
+function addHttpHeaderRow() {
+  httpReq.headers.push({ key: '', value: '' })
+}
+
+/** @param {number} idx */
+function removeHttpHeaderRow(idx) {
+  if (httpReq.headers.length <= 1) {
+    httpReq.headers[0].key = ''
+    httpReq.headers[0].value = ''
+    return
+  }
+  httpReq.headers.splice(idx, 1)
+}
 
 function resetCreateTemplateBlock() {
   createTplTemplates.value = []
@@ -573,6 +768,13 @@ const ifElseCfg = reactive({
   machinePredicate: /** @type {'running'|'stopped'|'exists'|'missing'} */ ('running'),
 })
 
+const vmPower = reactive({
+  blockTitle: '',
+  /** @type {'mine'|'tag'} */
+  targetMode: 'mine',
+  tagValue: '',
+})
+
 const notifyBell = reactive({
   title: '',
   body: '',
@@ -624,6 +826,18 @@ const errorHint = computed(() => {
     if (!createTplLoading.value && !createTplTemplates.value.length) return 'Нет доступных шаблонов сборки.'
     if (!String(selectedCreateTemplateId.value || '').trim()) return 'Выберите шаблон сборки.'
   }
+  if (modalKind.value === 'http_request') {
+    if (!String(httpReq.blockTitle || '').trim()) return 'Укажите название блока на холсте.'
+    if (!String(httpReq.url || '').trim()) return 'Укажите URL.'
+    const to = Number(httpReq.timeoutMs)
+    if (!Number.isFinite(to) || to < 1000 || to > 120000) return 'Таймаут: число от 1000 до 120000 мс.'
+  }
+  if (modalKind.value === 'vm_power') {
+    if (!String(vmPower.blockTitle || '').trim()) return 'Укажите название блока на холсте.'
+    if (vmPower.targetMode === 'tag' && !String(vmPower.tagValue || '').trim()) {
+      return 'Укажите имя среды или переключитесь на «Только мои среды».'
+    }
+  }
   return ''
 })
 
@@ -662,12 +876,16 @@ function resetForms() {
   ifElseCfg.tagScope = 'any'
   ifElseCfg.tagValue = ''
   ifElseCfg.machinePredicate = 'running'
+  vmPower.blockTitle = ''
+  vmPower.targetMode = 'mine'
+  vmPower.tagValue = ''
   notifyBell.title = ''
   notifyBell.body = ''
   notifyBell.href = ''
   waitTcCfg.blockTitle = 'Ожидание TeamCity'
   waitTcTimeoutSelect.value = '180'
   resetCreateTemplateBlock()
+  resetHttpReq()
 }
 
 /**
@@ -706,6 +924,13 @@ function applyInitialConfig(kind, cfg) {
     ifElseCfg.machinePredicate = n.machinePredicate
     return
   }
+  if (kind === 'vm_power') {
+    const n = normalizeVmPowerConfig(cfg)
+    vmPower.blockTitle = n.blockTitle || String(props.paletteItem?.title || '').trim() || 'ВМ'
+    vmPower.targetMode = n.targetMode
+    vmPower.tagValue = n.tagValue
+    return
+  }
   if (kind === 'notify_bell') {
     notifyBell.title = String(cfg.title || '')
     notifyBell.body = String(cfg.body || '')
@@ -717,6 +942,23 @@ function applyInitialConfig(kind, cfg) {
     waitTcCfg.blockTitle = n.blockTitle
     const tm = String(n.timeoutMinutes)
     waitTcTimeoutSelect.value = WAIT_TC_TIMEOUT_OPTIONS.some((o) => o.value === tm) ? tm : '180'
+    return
+  }
+  if (kind === 'http_request') {
+    resetHttpReq()
+    httpReq.blockTitle = String(cfg.blockTitle || 'HTTP-запрос').trim() || 'HTTP-запрос'
+    const m = String(cfg.method || 'GET').toUpperCase()
+    httpReq.method = HTTP_METHOD_OPTIONS.some((o) => o.value === m) ? m : 'GET'
+    httpReq.url = String(cfg.url || '')
+    const hdrs = Array.isArray(cfg.headers) ? cfg.headers : []
+    httpReq.headers = hdrs.length
+      ? hdrs.map((h) => ({
+          key: String(/** @type {Record<string, unknown>} */ (h).key || ''),
+          value: String(/** @type {Record<string, unknown>} */ (h).value || ''),
+        }))
+      : [{ key: '', value: '' }]
+    httpReq.body = String(cfg.body || '')
+    httpReq.timeoutMs = String(cfg.timeoutMs != null ? cfg.timeoutMs : 30000)
     return
   }
 }
@@ -767,6 +1009,9 @@ watch(
     }
     resetForms()
     if (kind === 'manual') hydrateManualFromHomeLaunch()
+    if (kind === 'vm_power' && props.paletteItem?.title) {
+      vmPower.blockTitle = String(props.paletteItem.title || '').trim()
+    }
   },
 )
 
@@ -829,6 +1074,25 @@ function submit() {
       templateName: meta ? String(meta.name || '').trim() : '',
       paramOverrides: { ...createTplParamOverrides },
     }
+  } else if (kind === 'http_request') {
+    const to = Math.min(120_000, Math.max(1000, Number(httpReq.timeoutMs) || 30_000))
+    const headers = httpReq.headers
+      .map((h) => ({ key: String(h.key || '').trim(), value: String(h.value || '') }))
+      .filter((h) => h.key)
+    config = {
+      blockTitle: String(httpReq.blockTitle || '').trim() || 'HTTP-запрос',
+      method: String(httpReq.method || 'GET').toUpperCase(),
+      url: String(httpReq.url || '').trim(),
+      headers,
+      body: String(httpReq.body || ''),
+      timeoutMs: to,
+    }
+  } else if (kind === 'vm_power') {
+    config = normalizeVmPowerConfig({
+      blockTitle: vmPower.blockTitle,
+      targetMode: vmPower.targetMode,
+      tagValue: vmPower.tagValue,
+    })
   }
   emit('confirm', config)
   emit('update:modelValue', false)

@@ -1,10 +1,19 @@
+import { normalizeIfElseConfig } from '@app-constants/automation-if-else.js'
+import { normalizeVmPowerConfig } from '@app-constants/automation-vm-power.js'
 import { normalizeWaitTeamCityConfig } from '@app-constants/automation-wait-teamcity.js'
 import { OTE_STATUS } from '@app-constants/ote.js'
 import { validateAutomationGraph } from '@app-utils/automation-graph.js'
 import { createError } from 'h3'
 import { eq } from 'drizzle-orm'
 import { oteBuildTemplates } from '../db/schema.js'
+import { executeAutomationHttpRequest } from './automation-http-request.js'
 import { evaluateIfElseCondition } from './automation-if-else-eval.js'
+import {
+  cloneAutomationVarsForApi,
+  interpolateAutomationDeep,
+  mergeAutomationOutputs,
+} from './automation-run-context.js'
+import { automationVarNamespaceFromNodeId } from '@app-utils/automation-var-namespace.js'
 import { buildTemplateIdVisibleToViewer, resolveBuildTemplateViewer } from './build-template-access.js'
 import { integrationUserKey } from './integrations/user-credentials.js'
 import { mergeParamsFromTemplateAndOverrides, queueOteTcJobFromBuildTemplate } from './ote-build-template-queue.js'
@@ -65,7 +74,7 @@ function vmPowerSkipReason(row, tcAction) {
 
 /**
  * Обход от узла-триггера (`manual` или `schedule`): уведомления, ветки If/Else по каталогу YC,
- * постановка и ожидание сборок TeamCity (создание из шаблона, старт/стоп «моих» OTE), ветки If/Else и «Ожидание TC».
+ * постановка и ожидание сборок TeamCity (создание из шаблона, старт/стоп ВМ), ветки If/Else и «Ожидание TC».
  *
  * @param {{
  *   db: import('drizzle-orm').LibSQLDatabase,
@@ -115,10 +124,14 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
   }
 
   let bellCount = 0
+  /** @type {{ vars: Record<string, unknown> }} */
+  const runContext = { vars: {} }
   /** @type {Array<Record<string, unknown>>} */
   const mineVmPower = []
   /** @type {Array<Record<string, unknown>>} */
   const createTemplateRuns = []
+  /** @type {Array<Record<string, unknown>>} */
+  const httpRequests = []
 
   /** Снимок каталога для If/Else и для блоков питания (один запрос list на запуск сценария). */
   /** @type {unknown[]} */
@@ -243,7 +256,8 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
    * @param {object} nd
    */
   async function runWaitTeamCityBlock(nodeId, nd) {
-    const cfg = nd.config && typeof nd.config === 'object' ? nd.config : {}
+    const rawCfg = nd.config && typeof nd.config === 'object' ? nd.config : {}
+    const cfg = /** @type {Record<string, unknown>} */ (interpolateAutomationDeep(rawCfg, runContext.vars))
     const { timeoutMinutes } = normalizeWaitTeamCityConfig(cfg)
     const buildIds = takePendingTcBuildIdsForWait()
     if (!buildIds.length) {
@@ -307,8 +321,19 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
       return
     }
     if (kind === 'condition' && variant === 'if_else') {
-      const cfg = nd.config && typeof nd.config === 'object' ? nd.config : {}
+      const rawCfg = nd.config && typeof nd.config === 'object' ? nd.config : {}
+      const cfg = /** @type {Record<string, unknown>} */ (interpolateAutomationDeep(rawCfg, runContext.vars))
+      const norm = normalizeIfElseConfig(cfg)
       const yes = evaluateIfElseCondition(cfg, cachedListRows)
+      const ifKey = automationVarNamespaceFromNodeId(id)
+      mergeAutomationOutputs(runContext, ifKey, {
+        branch: yes ? 'yes' : 'no',
+        matched: yes,
+        tagValue: norm.tagValue,
+        tagScope: norm.tagScope,
+        authorScope: norm.authorScope,
+        machinePredicate: norm.machinePredicate,
+      })
       await followOutgoing(id, 'branch', yes ? 'yes' : 'no')
       return
     }
@@ -330,9 +355,10 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
    */
   async function executeActionBlock(nodeId, n) {
     const nd = n.data
+    const rawCfg = nd.config && typeof nd.config === 'object' ? nd.config : {}
+    const cfg = /** @type {Record<string, unknown>} */ (interpolateAutomationDeep(rawCfg, runContext.vars))
 
     if (nd.variant === 'notify_bell') {
-      const cfg = nd.config && typeof nd.config === 'object' ? nd.config : {}
       const inserted = await insertAutomationBellNotification(userKey, {
         title: cfg.title,
         body: cfg.body,
@@ -343,7 +369,7 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
     }
 
     if (nd.variant === 'create_template') {
-      const cfg = nd.config && typeof nd.config === 'object' ? nd.config : {}
+      const tplKey = automationVarNamespaceFromNodeId(nodeId)
       const bid = Number(cfg.buildTemplateId)
       replacePendingTcBuildIds([])
       if (!Number.isFinite(bid) || bid < 1) {
@@ -351,6 +377,10 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
           nodeId,
           ok: false,
           error: 'Не выбран шаблон. Откройте блок и выберите шаблон из списка.',
+        })
+        mergeAutomationOutputs(runContext, tplKey, {
+          ok: false,
+          error: 'Не выбран шаблон',
         })
         return
       }
@@ -360,6 +390,7 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
           ok: false,
           error: 'TeamCity недоступен: добавьте персональный токен в профиле (раздел «Интеграции»).',
         })
+        mergeAutomationOutputs(runContext, tplKey, { ok: false, error: 'TeamCity недоступен' })
         return
       }
       const viewer = await resolveBuildTemplateViewer(db, config, user)
@@ -369,6 +400,7 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
           ok: false,
           error: 'Не удалось проверить доступ к шаблонам.',
         })
+        mergeAutomationOutputs(runContext, tplKey, { ok: false, error: 'Нет проверки доступа' })
         return
       }
       const allowed = await buildTemplateIdVisibleToViewer(db, bid, viewer)
@@ -378,12 +410,14 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
           ok: false,
           error: 'Нет доступа к выбранному шаблону для вашей группы каталога.',
         })
+        mergeAutomationOutputs(runContext, tplKey, { ok: false, error: 'Нет доступа к шаблону' })
         return
       }
       const tplRows = await db.select().from(oteBuildTemplates).where(eq(oteBuildTemplates.id, bid)).limit(1)
       const tplRow = tplRows[0]
       if (!tplRow) {
         createTemplateRuns.push({ nodeId, ok: false, error: 'Шаблон не найден.' })
+        mergeAutomationOutputs(runContext, tplKey, { ok: false, error: 'Шаблон не найден' })
         return
       }
       const merged = mergeParamsFromTemplateAndOverrides(tplRow.paramsJson, cfg.paramOverrides)
@@ -404,20 +438,50 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
           creationId: created?.id ?? null,
           teamCityBuildId: tc?.buildId ?? null,
         })
+        mergeAutomationOutputs(runContext, tplKey, {
+          ok: true,
+          creationId: created?.id ?? null,
+          teamCityBuildId: tc?.buildId ?? null,
+        })
       } catch (err) {
         const code = typeof err?.statusCode === 'number' ? err.statusCode : undefined
+        const msg = err?.message || String(err)
         createTemplateRuns.push({
           nodeId,
           ok: false,
           statusCode: code,
-          error: err?.message || String(err),
+          error: msg,
         })
+        mergeAutomationOutputs(runContext, tplKey, { ok: false, error: msg, statusCode: code })
       }
+      return
+    }
+
+    if (nd.variant === 'http_request') {
+      const httpKey = automationVarNamespaceFromNodeId(nodeId)
+      const result = await executeAutomationHttpRequest(cfg)
+      mergeAutomationOutputs(runContext, httpKey, {
+        ok: Boolean(result.ok && result.error == null),
+        status: result.status ?? null,
+        statusText: result.statusText ?? null,
+        bodyText: result.bodyText ?? '',
+        json: result.json ?? null,
+        error: result.error ?? null,
+      })
+      httpRequests.push({
+        nodeId,
+        namespace: httpKey,
+        ok: result.ok,
+        status: result.status,
+        error: result.error,
+      })
       return
     }
 
     if (nd.variant !== 'start_mine' && nd.variant !== 'stop_mine') return
 
+    const vmCfg = normalizeVmPowerConfig(cfg)
+    const vmKey = automationVarNamespaceFromNodeId(nodeId)
     const tcAction = nd.variant === 'start_mine' ? 'start' : 'stop'
     const ctx = await ensurePowerCtx()
     const all = needsCatalogSnapshot ? cachedAllInstances : await listAllInstancesInFolder(ctx.session, ctx.folderId)
@@ -430,14 +494,59 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
           mvp,
           actor: { login: user.login || '', email: user.email || '' },
         })
-    const mineRows = items.filter((row) => row.mine)
+
+    /** @type {Record<string, unknown>[]} */
+    let targetRows = []
+    if (vmCfg.targetMode === 'mine') {
+      targetRows = items.filter((row) => row.mine)
+    } else {
+      const want = String(vmCfg.tagValue || '').trim()
+      if (!want) {
+        mineVmPower.push({
+          nodeId,
+          variant: nd.variant,
+          results: [{ ok: false, error: 'Не задано имя среды (тег) для режима «по тегу».' }],
+        })
+        replacePendingTcBuildIds([])
+        mergeAutomationOutputs(runContext, vmKey, {
+          ok: false,
+          teamCityBuildIds: [],
+          steps: 0,
+          error: 'Пустой тег',
+          targetMode: 'tag',
+        })
+        return
+      }
+      targetRows = items.filter((row) => {
+        const cand = String(row.oteName || row.name || '').trim()
+        return cand === want
+      })
+      if (!targetRows.length) {
+        mineVmPower.push({
+          nodeId,
+          variant: nd.variant,
+          results: [{ ok: false, error: `Нет среды «${want}» в каталоге группы.` }],
+        })
+        replacePendingTcBuildIds([])
+        mergeAutomationOutputs(runContext, vmKey, {
+          ok: false,
+          teamCityBuildIds: [],
+          steps: 0,
+          tagMatched: false,
+          resolvedTag: want,
+          targetMode: 'tag',
+        })
+        return
+      }
+    }
+
     const buildTypeId = tcAction === 'start' ? ctx.g.startBuildTypeId : ctx.g.stopBuildTypeId
 
     /** @type {Array<Record<string, unknown>>} */
     const stepResults = []
 
     if (!buildTypeId) {
-      for (const row of mineRows) {
+      for (const row of targetRows) {
         stepResults.push({
           oteResourceId: row.id,
           ok: false,
@@ -446,10 +555,17 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
       }
       mineVmPower.push({ nodeId, variant: nd.variant, results: stepResults })
       replacePendingTcBuildIds([])
+      mergeAutomationOutputs(runContext, vmKey, {
+        ok: false,
+        teamCityBuildIds: [],
+        steps: stepResults.length,
+        error: 'Не задан buildTypeId',
+        targetMode: vmCfg.targetMode,
+      })
       return
     }
 
-    for (const row of mineRows) {
+    for (const row of targetRows) {
       const skip = vmPowerSkipReason(row, tcAction)
       if (skip) {
         stepResults.push({ oteResourceId: row.id, ok: true, skipped: true, reason: skip })
@@ -487,11 +603,17 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
     }
 
     mineVmPower.push({ nodeId, variant: nd.variant, results: stepResults })
-    replacePendingTcBuildIds(
-      stepResults
-        .filter((r) => r.ok && !r.skipped && r.teamCityBuildId)
-        .map((r) => String(r.teamCityBuildId)),
-    )
+    const tcIds = stepResults
+      .filter((r) => r.ok && !r.skipped && r.teamCityBuildId)
+      .map((r) => String(r.teamCityBuildId))
+    replacePendingTcBuildIds(tcIds)
+    mergeAutomationOutputs(runContext, vmKey, {
+      ok: stepResults.some((r) => r.ok && !r.skipped),
+      teamCityBuildIds: tcIds,
+      steps: stepResults.length,
+      targetMode: vmCfg.targetMode,
+      resolvedTag: vmCfg.targetMode === 'tag' ? String(vmCfg.tagValue || '').trim() : '',
+    })
   }
 
   await visitNode(String(startNodeId))
@@ -503,5 +625,7 @@ export async function runManualAutomationFromNode(deps, scenarioRow, startNodeId
     mineVmPower,
     createTemplateRuns,
     waitTeamCityRuns,
+    httpRequests,
+    contextVars: cloneAutomationVarsForApi(runContext.vars),
   }
 }

@@ -162,6 +162,9 @@ const VARIANTS_WITH_CONFIG = new Set([
   'if_else',
   'notify_bell',
   'create_template',
+  'http_request',
+  'start_mine',
+  'stop_mine',
   'teamcity_build',
 ])
 

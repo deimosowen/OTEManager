@@ -116,6 +116,16 @@
           </button>
           <button
             type="button"
+            class="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+            title="Краткая справка по холсту и блокам"
+            aria-label="Справка по работе с графом"
+            @click="workflowHelpOpen = true"
+          >
+            <CircleHelp class="size-3.5 shrink-0 text-slate-600" stroke-width="2" />
+            Справка
+          </button>
+          <button
+            type="button"
             class="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 shadow-sm transition hover:bg-rose-50"
             @click="clearCanvas"
           >
@@ -172,8 +182,207 @@
       :palette-item="pendingPaletteItem"
       :mode="blockModalMode"
       :initial-config="pendingInitialConfig"
+      :graph-nodes="nodes"
+      :graph-edges="edges"
+      :substitution-target-node-id="editingNodeId"
       @confirm="onBlockConfigConfirm"
     />
+
+    <AppModal
+      v-model="workflowHelpOpen"
+      labelledby="workflow-help-title"
+      accent="teal"
+      max-width-class="max-w-2xl"
+      panel-class="max-h-[min(92vh,52rem)] flex flex-col"
+      content-class="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden p-0 sm:p-0"
+    >
+      <div class="shrink-0 border-b border-slate-100 bg-slate-50/90 px-6 py-4 sm:px-7">
+        <div class="flex items-start gap-3">
+          <div
+            class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-emerald-600 shadow-inner"
+          >
+            <CircleHelp class="size-5 text-white" stroke-width="2" />
+          </div>
+          <div class="min-w-0">
+            <h2 id="workflow-help-title" class="text-lg font-extrabold tracking-tight text-slate-900">
+              Справка по конструктору сценария
+            </h2>
+            <p class="mt-1 text-sm font-medium leading-relaxed text-slate-600">
+              Здесь собраны правила холста, ограничения при сохранении и типичные ситуации.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="custom-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-6 py-4 sm:px-7 sm:py-5"
+      >
+        <div class="space-y-7 text-sm font-medium leading-relaxed text-slate-700">
+          <section>
+            <h3 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-400">Быстрый старт</h3>
+            <ul class="list-disc space-y-2 pl-5 marker:text-teal-500">
+              <li>Слева — палитра блоков. Вверху фильтр по типу: триггеры, условия, ожидание, действия.</li>
+              <li>Перетащите строку палитры на холст или просто нажмите на неё — блок появится на поле.</li>
+              <li>Соединяйте блоки линией от кружка справа (выход) к кружку слева у следующего (вход). Поток идёт от триггера к действиям.</li>
+              <li>
+                Чтобы изменить параметры: наведите на карточку → иконка настроек, или
+                <span class="font-semibold text-slate-800">двойной клик</span>
+                по блоку (если у типа есть окно настроек).
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-400">
+              Связи и правила графа (важные ограничения)
+            </h3>
+            <ul class="list-disc space-y-2 pl-5 marker:text-teal-500">
+              <li>
+                <span class="font-semibold text-slate-900">К триггеру нельзя подвести вход:</span>
+                связь всегда начинается от триггера или от середины цепочки, но не заканчивается на триггере.
+              </li>
+              <li>
+                <span class="font-semibold text-slate-900">Нельзя замкнуть цикл:</span>
+                если новая линия образует круг по стрелкам, редактор покажет предупреждение и не добавит связь.
+              </li>
+              <li>
+                <span class="font-semibold text-slate-900">Один блок не соединяют сам с собой.</span>
+              </li>
+              <li>
+                <span class="font-semibold text-slate-900">Условие If/Else</span>
+                имеет два выхода — «Да» и «Нет». Линию нужно начинать именно с нужной подписи на карточке. Из каждой ветки допускается
+                <span class="font-semibold text-slate-900">одна</span>
+                исходящая связь (нельзя продублировать ту же ветку дважды).
+              </li>
+              <li>
+                <span class="font-semibold text-slate-900">Ожидание TeamCity</span>
+                тоже два выхода — «Успешно» и «Ошибка»; правило «одна связь на ветку» такое же.
+              </li>
+              <li>
+                <span class="font-semibold text-slate-900">Вход «Ожидания TeamCity»</span>
+                допустим только от блока, который реально ставит сборку в TeamCity:
+                «Создать из шаблона», «Запуск ВМ» или «Остановка ВМ». От HTTP или колокольчика к ожиданию провести линию нельзя.
+              </li>
+              <li>
+                У обычных блоков (HTTP, уведомление и т.д.) один общий выход — не используйте «лишние» порты; если связь не создаётся,
+                проверьте, что тянете от основного выхода.
+              </li>
+              <li>
+                Если связь отклонена, обычно появляется короткое сообщение с причиной — прочитайте его: там же сказано про занятую ветку,
+                дубликат или цикл.
+              </li>
+              <li>
+                При сохранении сценария на сервер действуют лимиты:
+                <span class="font-semibold text-slate-900">до 80 блоков и до 160 связей.</span>
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-400">
+              Параллельные ветки и порядок
+            </h3>
+            <ul class="list-disc space-y-2 pl-5 marker:text-teal-500">
+              <li>
+                От одного триггера (или от одного блока с одним выходом) можно провести
+                <span class="font-semibold text-slate-900">несколько линий к разным блокам</span>
+                — получатся параллельные ветки после этого шага.
+              </li>
+              <li>Мини-карта в углу холста помогает ориентироваться на большом графе; стандартные кнопки масштаба — слева снизу.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-400">
+              Подстановки значений из других шагов
+            </h3>
+            <ul class="list-disc space-y-2 pl-5 marker:text-teal-500">
+              <li>
+                В окне настройки части блоков сверху есть блок «Подстановки». Он заполняется только если на холсте этот блок
+                <span class="font-semibold text-slate-900">соединён стрелками «выше по потоку»</span>
+                с блоками, которые отдают данные (условие, HTTP-запрос, создание из шаблона, запуск/остановка ВМ).
+              </li>
+              <li>
+                Если подстановок нет, показывается короткая подсказка: соедините блок с нужными предшественниками — тогда появятся кнопки.
+              </li>
+              <li>
+                Как вставить: кликните в текстовое поле (заголовок, URL, тело запроса и т.д.), затем нажмите нужную подстановку — фрагмент
+                добавится в позицию курсора. Если ничего не произошло, сначала сфокусируйте поле ввода.
+              </li>
+              <li>
+                Для блока, который вы только что добавили с палитры и ещё не связывали, список предков пуст — это нормально.
+              </li>
+              <li>
+                <span class="font-semibold text-slate-900">Поля внутри JSON после HTTP.</span>
+                Путь строится через точку: каждый фрагмент после точки — ключ объекта. Например
+                <code v-pre class="whitespace-nowrap rounded bg-slate-100 px-1 font-mono text-[11px] text-slate-800">{{ b_8.json.token }}</code>
+                или
+                <code v-pre class="whitespace-nowrap rounded bg-slate-100 px-1 font-mono text-[11px] text-slate-800">{{ b_8.json.user.id }}</code>
+                — префикс (
+                <code v-pre class="whitespace-nowrap rounded bg-slate-100 px-1 font-mono text-[11px] text-slate-800">b_8</code>
+                ) возьмите из своего блока в списке подстановок. Если указать только
+                <code v-pre class="whitespace-nowrap rounded bg-slate-100 px-1 font-mono text-[11px] text-slate-800">{{ b_8.json }}</code>
+                , подставится весь объект одной строкой JSON. Для элементов массива можно использовать индекс:
+                <code v-pre class="whitespace-nowrap rounded bg-slate-100 px-1 font-mono text-[11px] text-slate-800">{{ b_8.json.items.0 }}</code>.
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-400">Удаление и правки</h3>
+            <ul class="list-disc space-y-2 pl-5 marker:text-teal-500">
+              <li>
+                Выделите связь или блок и нажмите
+                <kbd class="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] font-bold text-slate-800">Del</kbd>
+                или
+                <kbd class="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] font-bold text-slate-800">Backspace</kbd>.
+              </li>
+              <li>У связи есть своя кнопка удаления на линии.</li>
+              <li>После удаления блока «осиротевшие» связи подчищаются автоматически.</li>
+            </ul>
+          </section>
+
+          <section v-if="!demoSandbox">
+            <h3 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-400">Сохранение и запуск</h3>
+            <ul class="list-disc space-y-2 pl-5 marker:text-teal-500">
+              <li>
+                Изменения графа
+                <span class="font-semibold text-slate-900">сохраняются на сервер автоматически</span>
+                после правок; рядом с подписью «Граф сценария» может мелькать статус сохранения.
+              </li>
+              <li>
+                Для триггера «Ручной запуск» после сохранения сценария на главной странице появятся кнопки запуска — их подпись и стиль
+                задаются в настройках этого блока.
+              </li>
+              <li>Если сохранение не проходит (ошибка сети или неверный граф), сообщение об этом лучше не игнорировать — исправьте граф или повторите позже.</li>
+            </ul>
+          </section>
+
+          <section v-else>
+            <h3 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-amber-700">Режим демо</h3>
+            <ul class="list-disc space-y-2 pl-5 marker:text-amber-500">
+              <li>Граф не отправляется на сервер — можно спокойно экспериментировать.</li>
+              <li>«Сбросить демо» вернёт пример; «Очистить холст» оставит поле пустым.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h3 class="mb-2 text-xs font-extrabold uppercase tracking-wide text-slate-400">Если что-то непонятно</h3>
+            <p class="text-sm text-slate-600">
+              Правила в интерфейсе и при сохранении совпадают: если связь не создаётся или сценарий не сохраняется, текст ошибки обычно
+              указывает на конкретное правило (ветка, цикл, ожидание TeamCity и т.д.). Эту справку можно открыть снова кнопкой «Справка» в
+              шапке холста.
+            </p>
+          </section>
+        </div>
+      </div>
+
+      <div class="shrink-0 border-t border-slate-100 bg-white px-6 py-4 sm:px-7">
+        <div class="flex justify-end">
+          <AppButton size="md" @click="workflowHelpOpen = false">Закрыть</AppButton>
+        </div>
+      </div>
+    </AppModal>
   </div>
 </template>
 
@@ -194,11 +403,14 @@ import {
   Plus,
   Power,
   PowerOff,
+  CircleHelp,
   RotateCcw,
   Timer,
   Trash2,
 } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import AppButton from '~/components/ui/AppButton.vue'
+import AppModal from '~/components/ui/AppModal.vue'
 import AppSelect from '~/components/ui/AppSelect.vue'
 import AutomationBlockConfigModal from '~/components/automation/AutomationBlockConfigModal.vue'
 import { loadManualLaunchPanelFromApi } from '~/composables/useManualHomeLaunch.js'
@@ -209,6 +421,7 @@ import {
   weekdaysSummaryRu,
 } from '~/constants/automation-schedule.js'
 import { summarizeIfElseConfig } from '~/constants/automation-if-else.js'
+import { summarizeVmPowerConfig } from '~/constants/automation-vm-power.js'
 import { summarizeWaitTeamCityConfig } from '~/constants/automation-wait-teamcity.js'
 import { normalizeManualHomeConfig } from '~/constants/automation-manual-home.js'
 import AutomationBlockNode from '~/components/automation/AutomationBlockNode.vue'
@@ -378,15 +591,17 @@ const paletteSections = [
         variant: 'start_mine',
         kind: 'action',
         iconKey: 'Play',
-        title: 'Запуск моих ВМ',
-        subtitle: 'Старт инстансов по фильтру автора',
+        title: 'Запуск ВМ',
+        subtitle: 'Режим «мои среды» или по имени среды в каталоге',
+        configModal: 'vm_power',
       },
       {
         variant: 'stop_mine',
         kind: 'action',
         iconKey: 'PowerOff',
-        title: 'Остановка моих ВМ',
-        subtitle: 'Мягкое выключение подходящих ВМ',
+        title: 'Остановка ВМ',
+        subtitle: 'Режим «мои среды» или по имени среды в каталоге',
+        configModal: 'vm_power',
       },
       {
         variant: 'notify_bell',
@@ -404,6 +619,14 @@ const paletteSections = [
         subtitle: 'Очередь создания OTE по шаблону и сохранённым параметрам',
         configModal: 'create_template',
       },
+      {
+        variant: 'http_request',
+        kind: 'action',
+        iconKey: 'Globe',
+        title: 'HTTP-запрос',
+        subtitle: 'Запрос по HTTP или HTTPS',
+        configModal: 'http_request',
+      },
     ],
   },
 ]
@@ -413,6 +636,7 @@ const filteredPaletteSections = computed(() =>
 )
 
 const configModalOpen = ref(false)
+const workflowHelpOpen = ref(false)
 /** @type {import('vue').Ref<object | null>} */
 const pendingPaletteItem = ref(null)
 /** @type {import('vue').Ref<{ x: number; y: number } | null>} */
@@ -501,6 +725,15 @@ function buildSummary(variant, config) {
     if (bid != null && String(bid).trim()) return `Шаблон #${bid}`
     return 'Создать из шаблона'
   }
+  if (variant === 'http_request') {
+    const method = String(config.method || 'GET').toUpperCase()
+    const u = String(config.url || '').trim()
+    const short = u.length > 42 ? `${u.slice(0, 42)}…` : u
+    return short ? `${method} ${short}` : 'HTTP-запрос'
+  }
+  if (variant === 'start_mine' || variant === 'stop_mine') {
+    return summarizeVmPowerConfig(config, variant)
+  }
   if (variant === 'manual') {
     const n = normalizeManualHomeConfig(config)
     const labels = n.buttons.map((b) => b.label).join(', ')
@@ -541,7 +774,11 @@ function onBlockConfigConfirm(config) {
       const summary = buildSummary(item.variant, config)
       let title = item.title
       if (
-        (item.variant === 'if_else' || item.variant === 'teamcity_build') &&
+        (item.variant === 'if_else' ||
+          item.variant === 'teamcity_build' ||
+          item.variant === 'http_request' ||
+          item.variant === 'start_mine' ||
+          item.variant === 'stop_mine') &&
         config &&
         typeof config === 'object'
       ) {
@@ -625,7 +862,11 @@ function nodeFromTemplate(item, position, opts = {}) {
     ''
   let title = item.title
   if (
-    (item.variant === 'if_else' || item.variant === 'teamcity_build') &&
+    (item.variant === 'if_else' ||
+      item.variant === 'teamcity_build' ||
+      item.variant === 'http_request' ||
+      item.variant === 'start_mine' ||
+      item.variant === 'stop_mine') &&
     config &&
     typeof config === 'object'
   ) {
