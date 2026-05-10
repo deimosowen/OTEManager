@@ -462,7 +462,16 @@ async function onManualLaunchClick(btn) {
       waitTc.length > 0
         ? ` · Ожидание TC: успешно ${waitOk}${waitFail ? `, неуспешно ${waitFail}` : ''}`
         : ''
-    toast.show(`«${btn.label}»: выполнено · уведомлений в колокольчике: ${n}${vmPart}${tplPart}${waitPart}`, 'success')
+    const httpRuns = Array.isArray(res?.httpRequests) ? res.httpRequests : []
+    let httpOk = 0
+    let httpFail = 0
+    for (const h of httpRuns) {
+      if (h?.ok) httpOk += 1
+      else httpFail += 1
+    }
+    const httpPart =
+      httpRuns.length > 0 ? ` · HTTP: успешно ${httpOk}${httpFail ? `, ошибок ${httpFail}` : ''}` : ''
+    toast.show(`«${btn.label}»: выполнено · уведомлений в колокольчике: ${n}${vmPart}${tplPart}${waitPart}${httpPart}`, 'success')
   } catch (e) {
     toast.show(e?.data?.message || e?.message || String(e), 'error')
   } finally {

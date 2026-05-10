@@ -12,7 +12,14 @@ export const AUTOMATION_GRAPH_LIMITS = {
 export const AUTOMATION_VARIANTS_BY_KIND = {
   trigger: new Set(['schedule', 'manual']),
   condition: new Set(['if_else']),
-  action: new Set(['start_mine', 'stop_mine', 'notify_bell', 'create_template', 'power_all_tag']),
+  action: new Set([
+    'start_mine',
+    'stop_mine',
+    'notify_bell',
+    'create_template',
+    'http_request',
+    'power_all_tag',
+  ]),
   wait: new Set(['teamcity_build']),
 }
 
