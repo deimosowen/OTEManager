@@ -63,12 +63,12 @@ SQLite в compose обычно в томе; путь к файлу задаёт�
 
 ```
 ├── src/                 # приложение Nuxt (pages, components, stores, …)
+│   ├── public/          # статика с корня сайта (/favicon.svg и т.д.)
 │   ├── tours/           # экскурсии driver.js и демо-данные (в т.ч. песочница автоматизаций)
 │   └── server/          # Nitro: api/, db/, plugins/, utils/
 ├── tests/
 │   ├── unit/
 │   └── integration/
-├── public/
 ├── nuxt.config.js
 ├── vitest.config.mjs
 ├── vitest.integration.config.mjs

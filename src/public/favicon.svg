@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true">
+  <defs>
+    <linearGradient id="ote-bg" x1="4" y1="3" x2="30" y2="31" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E3A5F"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="ote-glint" x1="8" y1="5" x2="26" y2="26" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.05"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="ote-clip">
+      <rect width="32" height="32" rx="8"/>
+    </clipPath>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="url(#ote-bg)"/>
+  <g clip-path="url(#ote-clip)">
+    <rect width="16" height="32" fill="url(#ote-glint)"/>
+  </g>
+  <g fill="#FFFFFF" fill-opacity="0.96">
+    <ellipse cx="15" cy="19" rx="8.8" ry="5.3"/>
+    <ellipse cx="11.2" cy="17.4" rx="4.9" ry="4.9"/>
+    <ellipse cx="16.4" cy="15.4" rx="5.8" ry="5.8"/>
+    <ellipse cx="22.2" cy="17.4" rx="4.9" ry="4.9"/>
+  </g>
+</svg>
