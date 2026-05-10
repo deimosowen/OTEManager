@@ -6,7 +6,7 @@
 import { spawnSync } from 'node:child_process'
 import process from 'node:process'
 
-const image = DOCKER_IMAGE=ghcr.io/deimosowen/ote-manager:0.1.5;//process.env.DOCKER_IMAGE?.trim()
+const image = process.env.DOCKER_IMAGE?.trim()
 if (!image) {
   console.error(
     'Задайте DOCKER_IMAGE, например:\n' +

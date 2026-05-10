@@ -65,14 +65,19 @@ export default defineNuxtConfig({
   /** Nitro: API, server middleware, только Node — рядом с приложением, один корень для деплоя/поддержки */
   serverDir: 'src/server',
   /**
-   * Абсолютный алиас для `src/constants` — иначе в dev Nitro иногда резолвит
-   * `~/constants/…` и относительные пути в `D:\\src\\constants\\...` (без каталога проекта).
+   * Абсолютные алиасы — иначе в dev Nitro на Windows иногда резолвит
+   * `~/…` и относительные пути в `D:\\src\\…` (без каталога проекта).
    */
   alias: {
     '@app-constants': resolve(__nuxtRoot, 'src/constants'),
+    '@app-utils': resolve(__nuxtRoot, 'src/utils'),
   },
   compatibilityDate: '2024-11-01',
   devtools: { enabled: true },
+
+  build: {
+    transpile: ['@vue-flow/core', '@vue-flow/background', '@vue-flow/controls', '@vue-flow/minimap'],
+  },
 
   postcss: {
     plugins: {
@@ -193,7 +198,9 @@ export default defineNuxtConfig({
     head: {
       title: 'OTE Manager',
       htmlAttrs: { lang: 'ru' },
+      meta: [{ name: 'theme-color', content: '#1E3A5F' }],
       link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg', sizes: 'any' },
         {
           rel: 'stylesheet',
           href: 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap',

@@ -8,7 +8,7 @@
  *   title: string,
  *   body: string | null,
  *   href: string,
- *   tcCreationId: number,
+ *   tcCreationId: number | null,
  * }} r
  */
 export function mapUserNotificationRow(r) {
@@ -20,6 +20,6 @@ export function mapUserNotificationRow(r) {
     title: r.title,
     body: r.body,
     href: r.href,
-    tcCreationId: r.tcCreationId,
+    tcCreationId: r.tcCreationId == null ? null : r.tcCreationId,
   }
 }

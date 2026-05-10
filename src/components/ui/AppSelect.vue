@@ -24,7 +24,7 @@ defineProps({
   /** Подсказка при наведении на лейбл */
   labelTitle: { type: String, default: '' },
   modelValue: { type: [String, Number], default: '' },
-  /** @type {{ value: string | number, label: string, isPersonal?: boolean }[]} */
+  /** @type {{ value: string | number, label: string, isPersonal?: boolean, icon?: object }[]} */
   options: { type: Array, default: () => [] },
   /** Если текущее значение не совпало ни с одной опцией (редко) */
   placeholder: { type: String, default: 'Выберите значение' },

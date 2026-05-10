@@ -3,8 +3,11 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../../../db/client.js'
 import { oteBuildTemplates } from '../../../db/schema.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../utils/audit-log.js'
-import { rowIsPersonal } from '../../../utils/build-template-access.js'
-import { integrationUserKey } from '../../../utils/integrations/user-credentials.js'
+import {
+  buildTemplateVisibleToViewer,
+  resolveBuildTemplateViewer,
+  rowIsPersonal,
+} from '../../../utils/build-template-access.js'
 import { requireOteUser } from '../../../utils/require-ote-auth.js'
 
 function parseTemplateId(raw) {
@@ -23,9 +26,13 @@ export default defineEventHandler(async (event) => {
   const row = rows[0]
   if (!row) throw createError({ statusCode: 404, message: 'Шаблон не найден' })
 
-  const me = integrationUserKey(user)
-  if (row.createdByLogin !== me) {
-    throw createError({ statusCode: 403, message: 'Удалять шаблон может только автор' })
+  const config = useRuntimeConfig(event)
+  const viewer = await resolveBuildTemplateViewer(db, config, user)
+  if (!viewer) throw createError({ statusCode: 401, message: 'Требуется вход' })
+
+  const canDelete = await buildTemplateVisibleToViewer(db, row, id, viewer)
+  if (!canDelete) {
+    throw createError({ statusCode: 403, message: 'Нет прав на удаление этого шаблона' })
   }
 
   await db.delete(oteBuildTemplates).where(eq(oteBuildTemplates.id, id))

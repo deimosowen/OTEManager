@@ -38,7 +38,7 @@ export const useAppNotificationsStore = defineStore('appNotifications', {
      *   title: string,
      *   body: string | null,
      *   href: string,
-     *   tcCreationId: number,
+     *   tcCreationId: number | null,
      * }} notification
      */
     applyIncoming(notification) {

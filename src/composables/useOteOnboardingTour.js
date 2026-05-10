@@ -1,9 +1,12 @@
 import { driver } from 'driver.js'
 import 'driver.js/dist/driver.css'
-import { nextTick } from 'vue'
+import { nextTick, ref } from 'vue'
 
 /** Отложить предложение оффера до закрытия вкладки. */
 export const ONBOARDING_OFFER_POSTPONE_SESSION_KEY = 'ote:onboarding-offer-postponed'
+
+/** Инкремент при «Позже», чтобы очередь анонсов пересчиталась (sessionStorage не реактивен). */
+export const onboardingOfferPostponeRevision = ref(0)
 
 export function postponeOnboardingOfferForSession() {
   if (!import.meta.client) return
@@ -12,6 +15,7 @@ export function postponeOnboardingOfferForSession() {
   } catch {
     /* quota / private mode */
   }
+  onboardingOfferPostponeRevision.value += 1
 }
 
 export function isOnboardingOfferPostponedSession() {

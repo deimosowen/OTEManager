@@ -28,21 +28,48 @@
             Ваши окружения и текущие операции в одном месте. Полный список и фильтры — в разделе «Окружения OTE».
           </p>
         </div>
-        <div class="mt-6 flex flex-wrap gap-3">
-          <NuxtLink
-            to="/environments"
-            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-extrabold text-brand shadow-lg shadow-slate-900/15 transition hover:bg-slate-50"
-          >
-            <LayoutGrid class="size-4" aria-hidden="true" />
-            Все окружения
-          </NuxtLink>
-          <NuxtLink
-            to="/create"
-            class="inline-flex items-center gap-2 rounded-xl border border-white/40 bg-white/10 px-4 py-2.5 text-sm font-extrabold text-white backdrop-blur-sm transition hover:bg-white/20"
-          >
-            <CirclePlus class="size-4" aria-hidden="true" />
-            Создать OTE
-          </NuxtLink>
+        <div data-tour="tour-home-hero-actions" class="mt-6 flex flex-wrap items-center gap-x-3 gap-y-3">
+          <div class="flex flex-wrap items-center gap-3">
+            <NuxtLink
+              to="/environments"
+              class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-extrabold text-brand shadow-lg shadow-slate-900/15 transition hover:bg-slate-50"
+            >
+              <LayoutGrid class="size-4" aria-hidden="true" />
+              Все окружения
+            </NuxtLink>
+            <NuxtLink
+              to="/create"
+              class="inline-flex items-center gap-2 rounded-xl border border-white/40 bg-white/10 px-4 py-2.5 text-sm font-extrabold text-white backdrop-blur-sm transition hover:bg-white/20"
+            >
+              <CirclePlus class="size-4" aria-hidden="true" />
+              Создать OTE
+            </NuxtLink>
+          </div>
+          <template v-if="manualHomeLaunch.buttons.length">
+            <div
+              class="flex flex-wrap items-center gap-3 border-l border-white/35 pl-3 sm:pl-4"
+              role="group"
+              aria-label="Сценарии"
+            >
+              <button
+                v-for="(btn, idx) in manualHomeLaunch.buttons"
+                :key="btn.scenarioId != null && btn.nodeId ? `${btn.scenarioId}-${btn.nodeId}` : idx"
+                type="button"
+                :disabled="manualLaunchBusy"
+                :class="heroManualLaunchBtnClass(btn.variant)"
+                @click="onManualLaunchClick(btn)"
+              >
+                <component
+                  :is="manualLaunchIcon(btn.iconKey)"
+                  v-if="btn.iconKey"
+                  class="size-4 shrink-0"
+                  stroke-width="2"
+                  aria-hidden="true"
+                />
+                {{ btn.label }}
+              </button>
+            </div>
+          </template>
         </div>
       </div>
     </section>
@@ -316,25 +343,132 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import {
+  Bell,
   ChevronRight,
   CirclePlus,
   LayoutGrid,
   Layers,
   Play,
+  Plus,
+  Power,
+  PowerOff,
+  Rocket,
   Server,
   Sparkles,
   Square,
   Trash2,
   Zap,
 } from 'lucide-vue-next'
-import { $fetch } from 'ofetch'
 import { notifyOteInstancesRefresh, subscribeOteInstancesRefresh } from '~/composables/useOteInstancesBroadcast'
+import { loadManualLaunchPanelFromApi, useManualHomeLaunch } from '~/composables/useManualHomeLaunch.js'
 import { OTE_STATUS } from '~/constants/ote'
 import { useEnvironmentsStore } from '~/stores/environments'
 import { oteTcCreationStatusLabel } from '~/utils/ote-tc-creation-status.js'
 
 const store = useEnvironmentsStore()
 const toast = useToast()
+const route = useRoute()
+
+const { manualHomeLaunch } = useManualHomeLaunch()
+
+function refreshManualLaunchHomePanel() {
+  if (route.path !== '/' && route.path !== '') return
+  void loadManualLaunchPanelFromApi($fetch)
+}
+
+watch(() => route.path, refreshManualLaunchHomePanel, { immediate: true })
+
+const manualLaunchBusy = ref(false)
+
+const MANUAL_LAUNCH_ICONS = {
+  Play,
+  Zap,
+  Rocket,
+  Power,
+  PowerOff,
+  Plus,
+  Bell,
+  Sparkles,
+  Layers,
+}
+
+function manualLaunchIcon(key) {
+  return MANUAL_LAUNCH_ICONS[key] || Layers
+}
+
+function heroManualLaunchBtnClass(variant) {
+  const base =
+    'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/90 focus-visible:ring-offset-2 focus-visible:ring-offset-brand disabled:pointer-events-none disabled:opacity-55'
+  if (variant === 'primary')
+    return `${base} bg-white text-brand shadow-lg shadow-slate-900/15 hover:bg-slate-50`
+  if (variant === 'danger')
+    return `${base} border border-white/45 bg-rose-600/35 text-white hover:bg-rose-600/50`
+  if (variant === 'warn')
+    return `${base} border border-white/45 bg-amber-400/25 text-white hover:bg-amber-400/40`
+  if (variant === 'ghost')
+    return `${base} text-white/95 hover:bg-white/15`
+  return `${base} border border-white/40 bg-white/10 text-white backdrop-blur-sm hover:bg-white/20`
+}
+
+async function onManualLaunchClick(btn) {
+  if (!btn.scenarioId || !btn.nodeId) {
+    toast.show('Кнопка не привязана к сценарию. Сохраните сценарий с блоком «Ручной запуск».', 'warn')
+    return
+  }
+  if (manualLaunchBusy.value) return
+  manualLaunchBusy.value = true
+  try {
+    const res = await $fetch(`/api/ote/automation-scenarios/${btn.scenarioId}/run-manual`, {
+      method: 'POST',
+      credentials: 'include',
+      body: { nodeId: btn.nodeId },
+    })
+    const n = typeof res?.bellNotifications === 'number' ? res.bellNotifications : 0
+    const powerSteps = Array.isArray(res?.mineVmPower) ? res.mineVmPower : []
+    let tcQueued = 0
+    let tcSkipped = 0
+    let tcErrors = 0
+    for (const step of powerSteps) {
+      const rows = Array.isArray(step?.results) ? step.results : []
+      for (const r of rows) {
+        if (r?.skipped) tcSkipped += 1
+        else if (r?.ok) tcQueued += 1
+        else tcErrors += 1
+      }
+    }
+    const vmPart =
+      powerSteps.length > 0
+        ? ` · ВМ (TeamCity): поставлено ${tcQueued}, пропуск ${tcSkipped}${tcErrors ? `, ошибок ${tcErrors}` : ''}`
+        : ''
+    const tplRuns = Array.isArray(res?.createTemplateRuns) ? res.createTemplateRuns : []
+    let tplOk = 0
+    let tplFail = 0
+    for (const r of tplRuns) {
+      if (r?.ok) tplOk += 1
+      else tplFail += 1
+    }
+    const tplPart =
+      tplRuns.length > 0
+        ? ` · Создание из шаблона: успешно ${tplOk}${tplFail ? `, ошибок ${tplFail}` : ''}`
+        : ''
+    const waitTc = Array.isArray(res?.waitTeamCityRuns) ? res.waitTeamCityRuns : []
+    let waitOk = 0
+    let waitFail = 0
+    for (const w of waitTc) {
+      if (w?.ok) waitOk += 1
+      else waitFail += 1
+    }
+    const waitPart =
+      waitTc.length > 0
+        ? ` · Ожидание TC: успешно ${waitOk}${waitFail ? `, неуспешно ${waitFail}` : ''}`
+        : ''
+    toast.show(`«${btn.label}»: выполнено · уведомлений в колокольчике: ${n}${vmPart}${tplPart}${waitPart}`, 'success')
+  } catch (e) {
+    toast.show(e?.data?.message || e?.message || String(e), 'error')
+  } finally {
+    manualLaunchBusy.value = false
+  }
+}
 
 const OTE_UPDATE_PRESET = 'build-template-update'
 
@@ -517,6 +651,7 @@ function seedTogglePower(row) {
 }
 
 let unsubEnvBroadcast = () => {}
+let unsubManualLaunchVisibility = () => {}
 
 watch(deleteModalOpen, (open) => {
   if (!open) {
@@ -558,15 +693,20 @@ onMounted(async () => {
   unsubEnvBroadcast = subscribeOteInstancesRefresh(() => {
     if (store.listSource === 'yc' || store.listSource === 'no_folder') void store.refreshFromYandexApi().catch(() => {})
   })
-  await Promise.all([
-    store.refreshFromYandexApi().catch(() => {}),
-    loadActiveCreations(),
-  ])
+  if (import.meta.client) {
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refreshManualLaunchHomePanel()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    unsubManualLaunchVisibility = () => document.removeEventListener('visibilitychange', onVis)
+  }
+  await Promise.all([store.refreshFromYandexApi().catch(() => {}), loadActiveCreations()])
   startPoll()
 })
 
 onBeforeUnmount(() => {
   unsubEnvBroadcast()
+  unsubManualLaunchVisibility()
   if (pollTimer.value != null) {
     clearInterval(pollTimer.value)
     pollTimer.value = null

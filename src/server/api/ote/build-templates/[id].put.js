@@ -3,7 +3,12 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../../../db/client.js'
 import { oteBuildTemplates } from '../../../db/schema.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../utils/audit-log.js'
-import { parseIsPersonalFromBody, rowIsPersonal } from '../../../utils/build-template-access.js'
+import {
+  buildTemplateVisibleToViewer,
+  parseIsPersonalFromBody,
+  resolveBuildTemplateViewer,
+  rowIsPersonal,
+} from '../../../utils/build-template-access.js'
 import {
   assertAllGroupIdsExist,
   parseBuildTemplateGroupIdsFromBody,
@@ -42,10 +47,16 @@ export default defineEventHandler(async (event) => {
   const existing = existingRows[0]
   if (!existing) throw createError({ statusCode: 404, message: 'Шаблон не найден' })
 
-  const me = integrationUserKey(user)
-  if (existing.createdByLogin !== me) {
-    throw createError({ statusCode: 403, message: 'Изменять шаблон может только автор' })
+  const config = useRuntimeConfig(event)
+  const viewer = await resolveBuildTemplateViewer(db, config, user)
+  if (!viewer) throw createError({ statusCode: 401, message: 'Требуется вход' })
+
+  const canEdit = await buildTemplateVisibleToViewer(db, existing, id, viewer)
+  if (!canEdit) {
+    throw createError({ statusCode: 403, message: 'Нет прав на изменение этого шаблона' })
   }
+
+  const me = integrationUserKey(user)
 
   const name = mustString(body, 'name', 256)
   if (!name) throw createError({ statusCode: 400, message: 'Укажите название шаблона' })
