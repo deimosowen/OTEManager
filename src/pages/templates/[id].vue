@@ -24,6 +24,7 @@
           <AppInput v-model="form.name" label="Название" placeholder="Windows SaaS · latest" autocomplete="off" />
         </div>
         <label
+          v-if="canManagePersonalFlag"
           class="mt-5 flex cursor-pointer items-start gap-3.5 rounded-xl border border-slate-200/90 bg-gradient-to-br from-slate-50/90 to-violet-50/20 p-4 transition hover:border-violet-200/60 hover:shadow-sm"
         >
           <input
@@ -209,6 +210,13 @@ const meta = reactive({
   updatedAt: '',
   createdByLogin: '',
   updatedByLogin: '',
+  canManagePersonalFlag: false,
+})
+
+/** Чекбокс «личный шаблон» только у автора; при создании нового — всегда доступен */
+const canManagePersonalFlag = computed(() => {
+  if (isNew.value) return true
+  return Boolean(meta.canManagePersonalFlag)
 })
 
 function applyTemplate(t) {
@@ -229,6 +237,7 @@ function applyTemplate(t) {
   meta.updatedAt = t.updatedAt || ''
   meta.createdByLogin = t.createdByLogin || ''
   meta.updatedByLogin = t.updatedByLogin || ''
+  meta.canManagePersonalFlag = Boolean(t.canManagePersonalFlag)
 }
 
 const computedTeamcityBuildUrl = computed(() => {
@@ -288,6 +297,7 @@ async function loadOne() {
     meta.updatedAt = ''
     meta.createdByLogin = ''
     meta.updatedByLogin = ''
+    meta.canManagePersonalFlag = true
     loading.value = false
     loadError.value = ''
     return

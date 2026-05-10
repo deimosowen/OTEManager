@@ -4,9 +4,11 @@
     labelledby="automation-block-config-title"
     :accent="accent"
     :max-width-class="modalMaxWidthClass"
-    content-class="p-0"
+    panel-class="max-h-[min(92vh,56rem)] flex flex-col"
+    content-class="flex min-h-0 flex-1 flex-col overflow-hidden p-0"
   >
-    <div class="px-6 pb-6 pt-5 sm:px-7 sm:pb-7 sm:pt-6">
+    <div class="flex min-h-0 flex-1 flex-col">
+      <div class="shrink-0 px-6 pb-2 pt-5 sm:px-7 sm:pt-6">
       <div class="mb-5 flex items-start gap-3">
         <div
           class="flex size-11 shrink-0 items-center justify-center rounded-xl shadow-inner"
@@ -26,7 +28,11 @@
           </p>
         </div>
       </div>
+      </div>
 
+      <div
+        class="automation-block-config-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-6 pb-4 sm:px-7"
+      >
       <!-- Расписание: в текстах только то, что нужно пользователю (без деталей реализации). -->
       <div v-if="modalKind === 'schedule'" class="space-y-5">
         <p class="rounded-xl bg-slate-50 px-3 py-2.5 text-xs font-medium leading-relaxed text-slate-600 ring-1 ring-slate-100">
@@ -291,10 +297,13 @@
       <p v-if="errorHint" class="mt-4 rounded-xl bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 ring-1 ring-rose-100">
         {{ errorHint }}
       </p>
+      </div>
 
-      <div class="mt-8 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-5">
-        <AppButton variant="secondary" size="md" @click="close">Отмена</AppButton>
-        <AppButton size="md" @click="submit">{{ primaryActionLabel }}</AppButton>
+      <div class="shrink-0 border-t border-slate-100 px-6 pb-6 pt-4 sm:px-7 sm:pb-7">
+        <div class="flex flex-wrap justify-end gap-2">
+          <AppButton variant="secondary" size="md" @click="close">Отмена</AppButton>
+          <AppButton size="md" @click="submit">{{ primaryActionLabel }}</AppButton>
+        </div>
       </div>
     </div>
   </AppModal>
@@ -825,3 +834,17 @@ function submit() {
   emit('update:modelValue', false)
 }
 </script>
+
+<style scoped>
+.automation-block-config-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+}
+.automation-block-config-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.automation-block-config-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.55);
+  border-radius: 999px;
+}
+</style>
