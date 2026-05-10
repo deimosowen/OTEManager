@@ -17,6 +17,24 @@ export function integrationUserKey(user) {
 }
 
 /**
+ * Логин, email и id — для сопоставления с полями вроде `createdByLogin`, если «основной» ключ сессии сменился.
+ * @param {{ login?: string, email?: string, id?: string }} user
+ * @returns {string[]}
+ */
+export function integrationUserIdentityKeys(user) {
+  /** @type {string[]} */
+  const out = []
+  const seen = new Set()
+  for (const v of [user?.login, user?.email, user?.id]) {
+    const t = String(v || '').trim().slice(0, 256)
+    if (!t || seen.has(t)) continue
+    seen.add(t)
+    out.push(t)
+  }
+  return out
+}
+
+/**
  * @param {string} userKey
  * @param {string} provider
  */

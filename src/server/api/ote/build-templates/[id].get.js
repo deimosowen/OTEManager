@@ -5,6 +5,7 @@ import {
   buildTemplateVisibleToViewer,
   resolveBuildTemplateViewer,
   rowIsPersonal,
+  viewerIsBuildTemplateAuthor,
 } from '../../../utils/build-template-access.js'
 import { fetchGroupIdsForBuildTemplate } from '../../../utils/build-template-groups.js'
 import { mapBuildTemplateFull } from '../../../utils/build-template-map.js'
@@ -30,7 +31,7 @@ export default defineEventHandler(async (event) => {
   const row = rows[0]
   if (!row) throw createError({ statusCode: 404, message: 'Шаблон не найден' })
 
-  /** Личный — только автор; общий — видимость по группам каталога (как в списке). */
+  /** Личный — только автор; общий — любой вошедший пользователь. */
   const visible = await buildTemplateVisibleToViewer(db, row, id, viewer)
   if (!visible) {
     throw createError({
@@ -40,9 +41,10 @@ export default defineEventHandler(async (event) => {
   }
 
   const template = mapBuildTemplateFull(row)
+  const canManagePersonalFlag = viewerIsBuildTemplateAuthor(viewer, row)
   if (rowIsPersonal(row.isPersonal)) {
-    return { template: { ...template, groupIds: [] } }
+    return { template: { ...template, groupIds: [], canManagePersonalFlag } }
   }
   const groupIds = await fetchGroupIdsForBuildTemplate(db, id)
-  return { template: { ...template, groupIds } }
+  return { template: { ...template, groupIds, canManagePersonalFlag } }
 })

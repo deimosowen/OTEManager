@@ -1,12 +1,11 @@
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, inArray, or, sql } from 'drizzle-orm'
 import { userHasAdminRole } from '@app-constants/rbac.js'
 import { oteBuildTemplates } from '../db/schema.js'
-import { fetchGroupIdsForBuildTemplate } from './build-template-groups.js'
 import { attachRbacToPublicUser } from './rbac/bootstrap.js'
-import { integrationUserKey } from './integrations/user-credentials.js'
+import { integrationUserIdentityKeys, integrationUserKey } from './integrations/user-credentials.js'
 
 /**
- * @typedef {{ userKey: string, groupId: number | null, isAdmin: boolean }} BuildTemplateViewer
+ * @typedef {{ userKey: string, identityKeys: string[], groupId: number | null, isAdmin: boolean }} BuildTemplateViewer
  */
 
 /**
@@ -20,10 +19,13 @@ export async function resolveBuildTemplateViewer(db, config, baseUserFromRequire
   const enriched = await attachRbacToPublicUser(db, config, baseUserFromRequire)
   if (!enriched?.id) return null
   const userKey = integrationUserKey(enriched)
+  const identityKeysRaw = integrationUserIdentityKeys(enriched)
+  const identityKeys = identityKeysRaw.length ? identityKeysRaw : userKey ? [userKey] : []
   const gidRaw = enriched.group?.id
   const groupId = gidRaw != null && Number.isFinite(Number(gidRaw)) ? Math.trunc(Number(gidRaw)) : null
   return {
     userKey,
+    identityKeys,
     groupId,
     isAdmin: userHasAdminRole(enriched.roles),
   }
@@ -39,9 +41,10 @@ export function sqlBuildTemplatesReadable(viewer) {
   if (!viewer?.userKey) {
     return sql`1 = 0`
   }
-  const userKeyStr = viewer.userKey
+  const keys = viewer.identityKeys?.length ? viewer.identityKeys : [viewer.userKey]
+  if (!keys.length) return sql`1 = 0`
 
-  const personal = sql`(${oteBuildTemplates.isPersonal} = 1 AND ${oteBuildTemplates.createdByLogin} = ${userKeyStr})`
+  const personal = and(eq(oteBuildTemplates.isPersonal, 1), inArray(oteBuildTemplates.createdByLogin, keys))
 
   /** @type {import('drizzle-orm').SQL} */
   let shared
@@ -65,35 +68,51 @@ export function sqlBuildTemplatesReadable(viewer) {
     ))`
   }
 
-  return sql`(${personal} OR ${shared})`
+  return or(personal, shared)
 }
 
 /** @deprecated Использовать sqlBuildTemplatesReadable после resolveBuildTemplateViewer */
 export function whereBuildTemplateVisibleToUser(userKey) {
   return sqlBuildTemplatesReadable({
     userKey,
+    identityKeys: [userKey],
     groupId: null,
     isAdmin: true,
   })
 }
 
 /**
- * Доступ к шаблону: просмотр, сохранение и удаление (личный — только автор; общий — группы каталога или «всем», если связок нет).
+ * Доступ к шаблону по id: просмотр, сохранение и удаление.
+ * Личный — только автор; общий — любой вошедший пользователь (ограничение по группам каталога не применяется).
+ * Привязки групп по-прежнему участвуют в фильтрации списка шаблонов (`sqlBuildTemplatesReadable`).
  *
- * @param {import('drizzle-orm/libsql').LibSQLDatabase} db
+ * @param {import('drizzle-orm/libsql').LibSQLDatabase} _db
  * @param {{ isPersonal?: unknown, createdByLogin?: unknown } | null | undefined} tplRow
- * @param {number} tplId
+ * @param {number} _tplId
  * @param {BuildTemplateViewer} viewer
  */
-export async function buildTemplateVisibleToViewer(db, tplRow, tplId, viewer) {
-  if (!viewer) return false
-  if (!tplRow || rowIsPersonal(tplRow.isPersonal)) {
-    return tplRow ? String(tplRow.createdByLogin || '') === viewer.userKey : false
+export async function buildTemplateVisibleToViewer(_db, tplRow, _tplId, viewer) {
+  if (!viewer?.userKey) return false
+  if (!tplRow) return false
+  if (rowIsPersonal(tplRow.isPersonal)) {
+    const keys = viewer.identityKeys?.length ? viewer.identityKeys : [viewer.userKey]
+    const author = String(tplRow.createdByLogin || '')
+    return keys.includes(author)
   }
+  return true
+}
 
-  const gids = await fetchGroupIdsForBuildTemplate(db, tplId)
-  if (!gids.length) return true
-  return viewer.groupId != null && gids.includes(Number(viewer.groupId))
+/**
+ * Автор шаблона — тот, чей ключ записан в `createdByLogin` при создании (совпадает с login/email/id из сессии).
+ *
+ * @param {BuildTemplateViewer} viewer
+ * @param {{ createdByLogin?: unknown } | null | undefined} tplRow
+ */
+export function viewerIsBuildTemplateAuthor(viewer, tplRow) {
+  if (!viewer?.userKey || !tplRow) return false
+  const keys = viewer.identityKeys?.length ? viewer.identityKeys : [viewer.userKey]
+  const author = String(tplRow.createdByLogin || '')
+  return keys.includes(author)
 }
 
 /**
@@ -120,7 +139,7 @@ export async function buildTemplateIdVisibleToViewer(db, templateId, viewer) {
  */
 export async function buildTemplateIdVisibleToUser(db, templateId, userKey) {
   /** @type {BuildTemplateViewer} */
-  const viewer = { userKey, groupId: null, isAdmin: true }
+  const viewer = { userKey, identityKeys: [userKey], groupId: null, isAdmin: true }
   return buildTemplateIdVisibleToViewer(db, templateId, viewer)
 }
 

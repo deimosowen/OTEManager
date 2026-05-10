@@ -26,11 +26,12 @@ export default defineEventHandler(async (event) => {
   }
 
   /** Каталог /templates: все общие + личные только у автора (чужие личные не видны никому) */
+  const browseKeys = viewer.identityKeys?.length ? viewer.identityKeys : [viewer.userKey]
   const browseVisibility =
-    viewer.userKey != null && String(viewer.userKey).length > 0
+    browseKeys.length > 0
       ? or(
           eq(oteBuildTemplates.isPersonal, 0),
-          and(eq(oteBuildTemplates.isPersonal, 1), eq(oteBuildTemplates.createdByLogin, viewer.userKey)),
+          and(eq(oteBuildTemplates.isPersonal, 1), inArray(oteBuildTemplates.createdByLogin, browseKeys)),
         )
       : sql`1 = 0`
   const visibility = browseCatalog ? browseVisibility : sqlBuildTemplatesReadable(viewer)

@@ -8,6 +8,7 @@ import {
   parseIsPersonalFromBody,
   resolveBuildTemplateViewer,
   rowIsPersonal,
+  viewerIsBuildTemplateAuthor,
 } from '../../../utils/build-template-access.js'
 import {
   assertAllGroupIdsExist,
@@ -94,7 +95,15 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, message: e?.message || String(e) })
   }
 
-  const personalBool = parseIsPersonalFromBody(body)
+  const isAuthor = viewerIsBuildTemplateAuthor(viewer, existing)
+  const personalBoolRequested = parseIsPersonalFromBody(body)
+  if (!isAuthor && personalBoolRequested !== rowIsPersonal(existing.isPersonal)) {
+    throw createError({
+      statusCode: 403,
+      message: 'Только автор шаблона может менять признак «личный шаблон».',
+    })
+  }
+  const personalBool = isAuthor ? personalBoolRequested : rowIsPersonal(existing.isPersonal)
   const groupIdsParsed = parseBuildTemplateGroupIdsFromBody(body)
 
   if (!personalBool) {
@@ -147,6 +156,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const groupIdsReturn = personalBool ? [] : await fetchGroupIdsForBuildTemplate(db, id)
-  return { template: { ...mapBuildTemplateFull(row), groupIds: groupIdsReturn } }
+  const canManagePersonalFlag = viewerIsBuildTemplateAuthor(viewer, row)
+  return { template: { ...mapBuildTemplateFull(row), groupIds: groupIdsReturn, canManagePersonalFlag } }
 })
 
