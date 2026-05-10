@@ -93,8 +93,11 @@
                         <p v-if="n.body" class="mt-0.5 line-clamp-3 text-xs font-medium leading-relaxed text-slate-600">
                           {{ n.body }}
                         </p>
-                        <p class="mt-2 text-[11px] font-bold text-brand underline decoration-brand/30 underline-offset-2">
-                          Открыть запрос · логи TeamCity
+                        <p
+                          v-if="notificationFooterLine(n)"
+                          class="mt-2 text-[11px] font-bold text-brand underline decoration-brand/30 underline-offset-2"
+                        >
+                          {{ notificationFooterLine(n) }}
                         </p>
                       </NuxtLink>
                     </div>
@@ -135,6 +138,7 @@ const open = ref(false)
 const rootRef = ref(null)
 
 function notificationKindShortLabel(kind) {
+  if (kind === APP_NOTIFICATION_KIND.AUTOMATION_BELL) return 'Сценарий'
   if (
     kind === APP_NOTIFICATION_KIND.OTE_CREATE_SUCCEEDED ||
     kind === APP_NOTIFICATION_KIND.OTE_UPDATE_SUCCEEDED
@@ -145,6 +149,7 @@ function notificationKindShortLabel(kind) {
 }
 
 function pillClass(kind) {
+  if (kind === APP_NOTIFICATION_KIND.AUTOMATION_BELL) return 'bg-sky-100 text-sky-950'
   if (
     kind === APP_NOTIFICATION_KIND.OTE_CREATE_SUCCEEDED ||
     kind === APP_NOTIFICATION_KIND.OTE_UPDATE_SUCCEEDED
@@ -152,6 +157,15 @@ function pillClass(kind) {
     return 'bg-emerald-100 text-emerald-900'
   }
   return 'bg-rose-100 text-rose-950'
+}
+
+/** @param {{ kind: string, href: string }} n */
+function notificationFooterLine(n) {
+  if (n.kind === APP_NOTIFICATION_KIND.AUTOMATION_BELL) {
+    if (n.href && n.href !== '/') return 'Перейти по ссылке'
+    return null
+  }
+  return 'Открыть запрос · логи TeamCity'
 }
 
 function toggleOpen() {

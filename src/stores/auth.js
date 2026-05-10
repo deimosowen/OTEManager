@@ -8,7 +8,7 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isLoggedIn: (s) => Boolean(s.user),
-    /** Роли — из `/api/auth/session` и SSR. `showOnboardingHints`: новые не-админы; пошаговый онбординг для администраторов не предлагается. */
+    /** Роли — из `/api/auth/session` и SSR. `showOnboardingHints`: новые не-админы. `pendingFeatureAnnouncement`: очередной анонс фич (см. `constants/feature-announcements.js`). */
     isAdmin: (s) => userHasAdminRole(s.user?.roles),
     displayName: (s) => s.user?.name || 'Гость',
     initials: (s) => {

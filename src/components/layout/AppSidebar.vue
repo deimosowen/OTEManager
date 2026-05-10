@@ -46,6 +46,7 @@ import {
   Home,
   Info,
   LayoutGrid,
+  Layers,
   ScrollText,
   SlidersHorizontal,
   Star,
@@ -102,6 +103,7 @@ function sidebarItemTour(to) {
     '/environments': 'tour-sidebar-env',
     '/create': 'tour-sidebar-create',
     '/templates': 'tour-sidebar-templates',
+    '/automation': 'tour-sidebar-automation',
   }
   return m[to] ?? undefined
 }
@@ -127,6 +129,7 @@ const navItems = computed(() => {
     { to: '/environments', label: 'Окружения OTE', icon: LayoutGrid, match: 'environments' },
     { to: '/create', label: 'Создать OTE', icon: CirclePlus, match: 'create' },
     { to: '/templates', label: 'Шаблоны', icon: FileStack, match: 'templates' },
+    { to: '/automation', label: 'Автоматизации', icon: Layers, match: 'automation' },
     { to: '/admin/health', label: 'Состояние', icon: Activity, match: 'admin-health' },
   ]
   if (auth.isAdmin) {
@@ -149,6 +152,7 @@ function isActive(item) {
   if (item.match === 'create') return route.path.startsWith('/create')
   if (item.match === 'about') return route.path.startsWith('/about')
   if (item.match === 'templates') return route.path.startsWith('/templates')
+  if (item.match === 'automation') return route.path.startsWith('/automation')
   if (item.match === 'audit') return route.path.startsWith('/audit')
   if (item.match === 'admin-health') return route.path.startsWith('/admin/health')
   if (item.match === 'admin-users') return route.path.startsWith('/admin/users')

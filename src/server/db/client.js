@@ -60,10 +60,12 @@ export async function initDatabase(config) {
   const client = createClient({ url })
   const db = drizzle(client, { schema })
   const migrationsFolder = resolveMigrationsDir(config?.sqliteMigrationsDir)
-  // eslint-disable-next-line no-console
-  console.log('[db] sqlitePath:', filePath)
-  // eslint-disable-next-line no-console
-  console.log('[db] migrationsFolder:', migrationsFolder)
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.log('[db] sqlitePath:', filePath)
+    // eslint-disable-next-line no-console
+    console.log('[db] migrationsFolder:', migrationsFolder)
+  }
 
   try {
     await migrate(db, { migrationsFolder })
@@ -90,6 +92,7 @@ export async function initDatabase(config) {
       'ote_user_role_assignments',
       'ote_group_teamcity_settings',
       'ote_group_yc_settings',
+      'user_notifications',
     ]
     for (const name of requiredTables) {
       const t = await client.execute({
