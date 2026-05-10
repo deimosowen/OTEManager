@@ -18,7 +18,8 @@
         <p class="mt-2 text-sm font-medium leading-relaxed text-slate-600">{{ hintText }}</p>
         <p
           v-if="oteLabel"
-          class="mt-4 truncate rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-center font-mono text-sm font-semibold text-slate-800"
+          class="mt-4 truncate rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5 text-center text-sm font-semibold text-slate-800"
+          :class="labelMono ? 'font-mono' : ''"
           :title="oteLabel"
         >
           {{ oteLabel }}
@@ -46,6 +47,8 @@ const props = defineProps({
   dialogTitle: { type: String, default: '' },
   /** Если задано — текст подсказки вместо вариантов по `variant`. */
   hintOverride: { type: String, default: '' },
+  /** Для имён с пробелами (сценарии и т.п.) удобнее без моноширинного шрифта. */
+  labelMono: { type: Boolean, default: true },
 })
 
 const emit = defineEmits(['update:modelValue', 'confirm'])

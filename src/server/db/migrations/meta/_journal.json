@@ -183,6 +183,41 @@
       "when": 1779100000000,
       "tag": "0026_user_settings_onboarding_hints",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1779200000000,
+      "tag": "0027_user_notifications_tc_optional",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1779200000001,
+      "tag": "0028_ote_automation_scenarios",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1779200000002,
+      "tag": "0029_ote_automation_scenarios_enabled",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1779300000000,
+      "tag": "0030_automation_schedule_fire",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1779400000000,
+      "tag": "0031_user_settings_feature_announcements",
+      "breakpoints": true
     }
   ]
 }

@@ -2,6 +2,7 @@ import { AUDIT_ACTION } from '@app-constants/audit.js'
 import { runTeamCityModifyDeleteDateBuild } from '../../../../utils/teamcity/modify-delete-date-build.js'
 import { getDb } from '../../../../db/client.js'
 import { auditPayloadFromUser, recordAuditEvent } from '../../../../utils/audit-log.js'
+import { queueOteTeamCityStartStopBuild } from '../../../../utils/ote-teamcity-queue-power.js'
 import { assertMetadataTagNotBlockedByOteCreation } from '../../../../utils/ote-tc-creation-guard.js'
 import {
   clearTcPending,
@@ -103,12 +104,36 @@ export default defineEventHandler(async (event) => {
   }
   const tcBase = g.tcRestBaseUrl
 
+  if (action === 'start' || action === 'stop') {
+    const authorization = await resolveTeamCityAuthorizationHeader(config, { user })
+    const buildTypeId = action === 'start' ? g.startBuildTypeId : g.stopBuildTypeId
+    const rc = await queueOteTeamCityStartStopBuild({
+      db,
+      config,
+      user,
+      folderId,
+      session,
+      oteResourceId: id,
+      action,
+      tcRestBaseUrl: tcBase,
+      buildTypeId,
+      authorization,
+    })
+    return {
+      ok: true,
+      action,
+      metadataTag: rc.metadataTag,
+      buildTypeId: rc.buildTypeId,
+      teamCity: rc.teamCity,
+    }
+  }
+
   const members = await listMemberInstancesForOteId(session, folderId, id, config)
   if (!members.length) {
     throw createError({ statusCode: 404, message: 'ВМ не найдены' })
   }
 
-  if (action === 'delete' && (await isOteResourceProtected(db, id))) {
+  if (await isOteResourceProtected(db, id)) {
     throw createError({
       statusCode: 403,
       message:
@@ -136,23 +161,18 @@ export default defineEventHandler(async (event) => {
 
   await assertMetadataTagNotBlockedByOteCreation(db, metadataTag)
 
-  const buildTypeId =
-    action === 'start' ? g.startBuildTypeId : action === 'stop' ? g.stopBuildTypeId : g.deleteBuildTypeId
+  const buildTypeId = g.deleteBuildTypeId
   if (!buildTypeId) {
     throw createError({ statusCode: 503, message: 'Для вашей группы не задан buildTypeId для этой операции в настройках.' })
   }
 
   try {
     const authorization = await resolveTeamCityAuthorizationHeader(config, { user })
-    const properties = { 'metadata.tag': metadataTag }
-    if (action === 'delete') {
-      properties['delete.exact_match'] = 'true'
-    }
+    const properties = { 'metadata.tag': metadataTag, 'delete.exact_match': 'true' }
 
-    const pendingAction = action
     const tcAuthUserKey = integrationUserKey(user)
     const reserved = await reserveTcPendingSlot(id, {
-      action: pendingAction,
+      action,
       tcAuthUserKey,
       tcRestBaseUrl: tcBase,
     })
@@ -179,15 +199,9 @@ export default defineEventHandler(async (event) => {
       throw queueErr
     }
     await updateTcPendingBuildId(id, { buildId: tc.buildId })
-    const auditAction =
-      action === 'start'
-        ? AUDIT_ACTION.OTE_TC_START
-        : action === 'stop'
-          ? AUDIT_ACTION.OTE_TC_STOP
-          : AUDIT_ACTION.OTE_TC_DELETE
     await recordAuditEvent(
       auditPayloadFromUser(user, {
-        actionCode: auditAction,
+        actionCode: AUDIT_ACTION.OTE_TC_DELETE,
         oteResourceId: id,
         oteTag: metadataTag,
         details: {
