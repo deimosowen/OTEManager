@@ -1,4 +1,5 @@
-import { index, integer, primaryKey, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core'
+import { sql } from 'drizzle-orm'
+import { index, integer, primaryKey, sqliteTable, text, unique, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 /**
  * Служебные ключи приложения (версия схемы, флаги и т.д.).
@@ -135,12 +136,18 @@ export const userNotifications = sqliteTable(
     kind: text('kind', { length: 64 }).notNull(),
     title: text('title', { length: 512 }).notNull(),
     body: text('body', { length: 2048 }),
-    href: text('href', { length: 1024 }).notNull(),
-    tcCreationId: integer('tc_creation_id').notNull(),
+    href: text('href', { length: 1024 }).notNull().default('/'),
+    /**
+     * Id запроса создания OTE в TeamCity для видов `ote_*`; для `automation_bell` всегда `null`.
+     * Для строк с tc действует частичный уникальный индекс; связку kind/tc соблюдает код при вставке.
+     */
+    tcCreationId: integer('tc_creation_id'),
   },
   (t) => ({
-    userTcKindUq: unique('user_notifications_user_tc_kind_uq').on(t.userKey, t.tcCreationId, t.kind),
     userCreatedIdx: index('user_notifications_user_created_idx').on(t.userKey, t.createdAt),
+    userTcKindUq: uniqueIndex('user_notifications_user_tc_kind_uq')
+      .on(t.userKey, t.tcCreationId, t.kind)
+      .where(sql`${t.tcCreationId} is not null`),
   }),
 )
 
@@ -150,6 +157,8 @@ export const userSettings = sqliteTable('user_settings', {
   timezone: text('timezone', { length: 128 }).notNull().default('UTC'),
   /** 1 — пользователь закрыл onboarding-подсказки; только вместе с «новым» firstSeen (см. onboarding-hints). */
   onboardingHintsDismissed: integer('onboarding_hints_dismissed').notNull().default(0),
+  /** JSON-массив id закрытых анонсов фич (см. `constants/feature-announcements.js`). */
+  featureAnnouncementsDismissed: text('feature_announcements_dismissed').notNull().default('[]'),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }),
 })
 
@@ -345,5 +354,33 @@ export const oteUserListColumnPrefs = sqliteTable(
   (t) => ({
     pk: primaryKey({ columns: [t.userKey, t.viewKey] }),
     updatedIdx: index('ote_user_list_column_prefs_updated_idx').on(t.updatedAt),
+  }),
+)
+
+/** Сценарии автоматизации (граф в JSON); доступ по группе каталога. */
+export const oteAutomationScenarios = sqliteTable(
+  'ote_automation_scenarios',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    groupId: integer('group_id')
+      .notNull()
+      .references(() => oteAppGroups.id, { onDelete: 'restrict' }),
+    name: text('name', { length: 256 }).notNull(),
+    status: text('status', { length: 32 }).notNull().default('draft'),
+    enabled: integer('enabled').notNull().default(1),
+    graphJson: text('graph_json').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    createdByUserKey: text('created_by_user_key', { length: 256 }).notNull(),
+    createdByLogin: text('created_by_login', { length: 256 }).notNull(),
+    createdByEmail: text('created_by_email', { length: 512 }).notNull(),
+    updatedByUserKey: text('updated_by_user_key', { length: 256 }).notNull(),
+    updatedByLogin: text('updated_by_login', { length: 256 }).notNull(),
+    updatedByEmail: text('updated_by_email', { length: 512 }).notNull(),
+    /** JSON: { [nodeId]: slotUtcIso } — антидребезг одного слота на узел расписания. */
+    scheduleLastFiredByNodeJson: text('schedule_last_fired_by_node_json'),
+  },
+  (t) => ({
+    groupUpdatedIdx: index('ote_automation_scenarios_group_updated_idx').on(t.groupId, t.updatedAt),
   }),
 )

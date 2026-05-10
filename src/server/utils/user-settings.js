@@ -25,6 +25,18 @@ export async function getTimezoneForUser(user) {
   const key = integrationUserKey(user)
   if (!key) return DEFAULT_USER_TIMEZONE
   const db = getDb()
+  return getTimezoneForUserLoginKey(db, key)
+}
+
+/**
+ * Часовой пояс из `user_settings` по ключу пользователя в интеграциях (логин / email / sub).
+ *
+ * @param {import('drizzle-orm').LibSQLDatabase} db
+ * @param {string} userLoginKey
+ */
+export async function getTimezoneForUserLoginKey(db, userLoginKey) {
+  const key = String(userLoginKey || '').trim()
+  if (!key) return DEFAULT_USER_TIMEZONE
   const rows = await db
     .select({ timezone: userSettings.timezone })
     .from(userSettings)

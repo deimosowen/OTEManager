@@ -78,6 +78,8 @@ export function whereBuildTemplateVisibleToUser(userKey) {
 }
 
 /**
+ * Доступ к шаблону: просмотр, сохранение и удаление (личный — только автор; общий — группы каталога или «всем», если связок нет).
+ *
  * @param {import('drizzle-orm/libsql').LibSQLDatabase} db
  * @param {{ isPersonal?: unknown, createdByLogin?: unknown } | null | undefined} tplRow
  * @param {number} tplId

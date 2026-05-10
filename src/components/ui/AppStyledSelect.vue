@@ -31,6 +31,13 @@
       >
         <span class="min-w-0 flex-1">
           <span v-if="selectedOption" class="flex min-w-0 items-center gap-2">
+            <component
+              :is="selectedOption.icon"
+              v-if="selectedOption.icon"
+              class="size-4 shrink-0 text-slate-500"
+              stroke-width="2"
+              aria-hidden="true"
+            />
             <span class="truncate font-semibold text-slate-900">{{ selectedOption.label }}</span>
             <PersonalTemplateBadge v-if="selectedOption.isPersonal" compact />
           </span>
@@ -62,7 +69,7 @@
               type="button"
               role="option"
               :aria-selected="isSelected(opt) ? 'true' : 'false'"
-              class="flex w-full items-start gap-2 px-3.5 py-2.5 text-left text-sm transition hover:bg-slate-50"
+              class="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm transition hover:bg-slate-50"
               :class="
                 isSelected(opt)
                   ? 'bg-gradient-to-r from-brand/[0.08] to-sky-50/50 font-bold text-brand-dark'
@@ -70,6 +77,14 @@
               "
               @click="choose(opt)"
             >
+              <!-- Без иконки не резервируем колонку — иначе узкая панель (напр. время ЧЧ:ММ) ломает подпись посимвольно. -->
+              <span
+                v-if="opt.icon"
+                class="flex size-4 shrink-0 items-center justify-center text-slate-500"
+                aria-hidden="true"
+              >
+                <component :is="opt.icon" class="size-4" stroke-width="2" />
+              </span>
               <span class="min-w-0 flex-1 whitespace-normal break-words leading-snug">{{ opt.label }}</span>
               <PersonalTemplateBadge v-if="opt.isPersonal" />
             </button>
@@ -91,7 +106,8 @@ const props = defineProps({
   labelTitle: { type: String, default: '' },
   modelValue: { type: [String, Number], default: '' },
   /**
-   * @type {{ value: string | number, label: string, isPersonal?: boolean }[]}
+   * @type {{ value: string | number, label: string, isPersonal?: boolean, icon?: object }[]}
+   * `icon` — компонент Vue (например из lucide-vue-next), необязательно.
    */
   options: { type: Array, default: () => [] },
   /** Текст, если значение ещё не выбрано и список не пуст. */

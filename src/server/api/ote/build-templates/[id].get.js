@@ -1,10 +1,13 @@
 import { eq } from 'drizzle-orm'
 import { getDb } from '../../../db/client.js'
 import { oteBuildTemplates } from '../../../db/schema.js'
-import { rowIsPersonal } from '../../../utils/build-template-access.js'
+import {
+  buildTemplateVisibleToViewer,
+  resolveBuildTemplateViewer,
+  rowIsPersonal,
+} from '../../../utils/build-template-access.js'
 import { fetchGroupIdsForBuildTemplate } from '../../../utils/build-template-groups.js'
 import { mapBuildTemplateFull } from '../../../utils/build-template-map.js'
-import { integrationUserKey } from '../../../utils/integrations/user-credentials.js'
 import { requireOteUser } from '../../../utils/require-ote-auth.js'
 
 function parseTemplateId(raw) {
@@ -15,20 +18,24 @@ function parseTemplateId(raw) {
 
 export default defineEventHandler(async (event) => {
   const user = requireOteUser(event)
-  const me = integrationUserKey(user)
   const id = parseTemplateId(event.context.params?.id)
   if (!id) throw createError({ statusCode: 400, message: 'Некорректный id' })
 
   const db = getDb()
+  const config = useRuntimeConfig(event)
+  const viewer = await resolveBuildTemplateViewer(db, config, user)
+  if (!viewer) throw createError({ statusCode: 401, message: 'Требуется вход' })
+
   const rows = await db.select().from(oteBuildTemplates).where(eq(oteBuildTemplates.id, id)).limit(1)
   const row = rows[0]
   if (!row) throw createError({ statusCode: 404, message: 'Шаблон не найден' })
 
-  /** Личный — только автор; общий — любой вошедший пользователь (просмотр/редактирование по автору в PUT). */
-  if (rowIsPersonal(row.isPersonal) && String(row.createdByLogin || '') !== me) {
+  /** Личный — только автор; общий — видимость по группам каталога (как в списке). */
+  const visible = await buildTemplateVisibleToViewer(db, row, id, viewer)
+  if (!visible) {
     throw createError({
       statusCode: 403,
-      message: 'Этот шаблон личный и доступен только автору',
+      message: 'Нет доступа к этому шаблону',
     })
   }
 
